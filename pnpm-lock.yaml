@@ -222,7 +222,11 @@ importers:
 
   packages/assets: {}
 
-  packages/logic: {}
+  packages/logic:
+    devDependencies:
+      typescript:
+        specifier: 5.7.3
+        version: 5.7.3
 
   packages/mocks:
     dependencies:
