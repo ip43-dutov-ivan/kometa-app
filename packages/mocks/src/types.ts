@@ -1,8 +1,12 @@
 export type UserId = string;
 export type TaskId = string;
 export type ResponseId = string;
+export type CompletionRequestId = string;
 export type MatchId = string;
 export type ConversationId = string;
+export type MessageId = string;
+export type FeedbackId = string;
+export type ReportId = string;
 
 export type TaskStatus =
   | "open"
@@ -12,6 +16,7 @@ export type TaskStatus =
   | "completed"
   | "cancelled";
 export type ResponseStatus = "pending" | "accepted" | "declined" | "withdrawn";
+export type CompletionRequestStatus = "pending" | "confirmed" | "concernRaised";
 export type ReportStatus = "open" | "reviewing" | "resolved" | "dismissed";
 
 export interface PageInfo {
@@ -37,6 +42,8 @@ export interface UserProfile {
   completedTasks: number;
   accountStatus: "active" | "blocked";
   avatarUrl?: string;
+  blockedReason?: string;
+  blockedAt?: string;
 }
 
 export interface AuthSession {
@@ -71,6 +78,18 @@ export interface TaskResponse {
   createdAt: string;
 }
 
+export interface CompletionRequest {
+  id: CompletionRequestId;
+  taskId: TaskId;
+  requestedByUserId: UserId;
+  confirmedByUserId?: UserId;
+  status: CompletionRequestStatus;
+  note?: string;
+  concernReason?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Match {
   id: MatchId;
   taskId: TaskId;
@@ -89,7 +108,7 @@ export interface Conversation {
 }
 
 export interface ChatMessage {
-  id: string;
+  id: MessageId;
   conversationId: ConversationId;
   senderId: UserId;
   body: string;
@@ -97,7 +116,7 @@ export interface ChatMessage {
 }
 
 export interface Feedback {
-  id: string;
+  id: FeedbackId;
   taskId: TaskId;
   authorId: UserId;
   receiverId: UserId;
@@ -107,17 +126,19 @@ export interface Feedback {
 }
 
 export interface Report {
-  id: string;
+  id: ReportId;
   reporterId: UserId;
   reportedUserId: UserId;
   taskId?: TaskId;
   reason: string;
   status: ReportStatus;
+  resolutionNote?: string;
   createdAt: string;
   updatedAt: string;
 }
 
 export interface ApiError {
-  message: string;
   code: string;
+  message: string;
+  details?: Record<string, unknown>;
 }

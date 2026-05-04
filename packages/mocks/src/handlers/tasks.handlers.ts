@@ -1,8 +1,19 @@
 import { http } from "msw";
 import { apiPath } from "../config";
-import { currentUserId, responses, tasks } from "../data";
-import type { Task, TaskStatus } from "../types";
-import { createId, error, json, listJson, now } from "./utils";
+import { completionRequests, currentUserId, responses, tasks } from "../data";
+import type { CompletionRequest, Task, TaskStatus, UserId } from "../types";
+import {
+  createId,
+  error,
+  getMatchForTask,
+  getPagination,
+  getOtherParticipantId,
+  isTaskParticipant,
+  json,
+  pagedListJson,
+  requireActiveCurrentUser,
+  now,
+} from "./utils";
 
 export const taskHandlers = [
   http.get(apiPath("/tasks"), ({ request }) => {
@@ -13,6 +24,7 @@ export const taskHandlers = [
     const available = url.searchParams.get("available");
     const category = url.searchParams.get("category")?.toLocaleLowerCase();
     const location = url.searchParams.get("location")?.toLocaleLowerCase();
+    const { limit, offset } = getPagination(url);
 
     const result = tasks.filter((task) => {
       if (status && task.status !== status) {
@@ -36,7 +48,7 @@ export const taskHandlers = [
         }
       }
 
-      if (available === "true" && task.ownerId === currentUserId) {
+      if (available === "true" && (task.ownerId === currentUserId || task.status !== "open")) {
         return false;
       }
 
@@ -51,10 +63,15 @@ export const taskHandlers = [
       return true;
     });
 
-    return listJson(result);
+    return pagedListJson(result, limit, offset);
   }),
 
   http.post(apiPath("/tasks"), async ({ request }) => {
+    const activeUser = requireActiveCurrentUser();
+    if (activeUser.response) {
+      return activeUser.response;
+    }
+
     const body = await request.json().catch(() => ({}));
     const input = body as Partial<Task>;
 
@@ -87,6 +104,11 @@ export const taskHandlers = [
   }),
 
   http.patch(apiPath("/tasks/:taskId"), async ({ params, request }) => {
+    const activeUser = requireActiveCurrentUser();
+    if (activeUser.response) {
+      return activeUser.response;
+    }
+
     const task = tasks.find((item) => item.id === params.taskId);
 
     if (!task) {
@@ -115,4 +137,205 @@ export const taskHandlers = [
 
     return json(task);
   }),
+
+  http.post(apiPath("/tasks/:taskId/start"), ({ params }) => {
+    const activeUser = requireActiveCurrentUser();
+    if (activeUser.response) {
+      return activeUser.response;
+    }
+
+    const task = tasks.find((item) => item.id === params.taskId);
+
+    if (!task) {
+      return error("Task not found", "task_not_found", 404);
+    }
+
+    const match = getMatchForTask(task.id, currentUserId);
+
+    if (!match) {
+      return error("Only matched participants can start this task", "task_start_forbidden", 403);
+    }
+
+    if (task.status !== "matched") {
+      return error("Only matched tasks can be started", "task_start_not_allowed", 409);
+    }
+
+    task.status = "inProgress";
+    task.updatedAt = now();
+
+    return json(task);
+  }),
+
+  http.post(apiPath("/tasks/:taskId/completion-requests"), async ({ params, request }) => {
+    const activeUser = requireActiveCurrentUser();
+    if (activeUser.response) {
+      return activeUser.response;
+    }
+
+    const task = tasks.find((item) => item.id === params.taskId);
+
+    if (!task) {
+      return error("Task not found", "task_not_found", 404);
+    }
+
+    if (!isTaskParticipant(task)) {
+      return error(
+        "Only matched participants can request completion",
+        "completion_request_forbidden",
+        403,
+      );
+    }
+
+    if (task.status !== "matched" && task.status !== "inProgress") {
+      return error(
+        "Only matched or in-progress tasks can request completion",
+        "completion_request_not_allowed",
+        409,
+      );
+    }
+
+    const body = await request.json().catch(() => ({}));
+    const input = body as Partial<Pick<CompletionRequest, "note">>;
+    const timestamp = now();
+    const completionRequest: CompletionRequest = {
+      id: createId("completion-request"),
+      taskId: task.id,
+      requestedByUserId: currentUserId,
+      status: "pending",
+      note: input.note?.trim() || undefined,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    };
+
+    task.status = "completionRequested";
+    task.updatedAt = timestamp;
+    completionRequests.unshift(completionRequest);
+
+    return json({ completionRequest, task }, { status: 201 });
+  }),
+
+  http.post(apiPath("/tasks/:taskId/completion-requests/:requestId/confirm"), ({ params }) => {
+    const activeUser = requireActiveCurrentUser();
+    if (activeUser.response) {
+      return activeUser.response;
+    }
+
+    const result = getPendingCompletionRequest(
+      String(params.taskId),
+      String(params.requestId),
+      currentUserId,
+    );
+
+    if ("response" in result) {
+      return result.response;
+    }
+
+    const timestamp = now();
+    result.completionRequest.status = "confirmed";
+    result.completionRequest.confirmedByUserId = currentUserId;
+    result.completionRequest.updatedAt = timestamp;
+    result.task.status = "completed";
+    result.task.updatedAt = timestamp;
+
+    return json({ completionRequest: result.completionRequest, task: result.task });
+  }),
+
+  http.post(
+    apiPath("/tasks/:taskId/completion-requests/:requestId/concerns"),
+    async ({ params, request }) => {
+      const activeUser = requireActiveCurrentUser();
+      if (activeUser.response) {
+        return activeUser.response;
+      }
+
+      const result = getPendingCompletionRequest(
+        String(params.taskId),
+        String(params.requestId),
+        currentUserId,
+      );
+
+      if ("response" in result) {
+        return result.response;
+      }
+
+      const body = await request.json().catch(() => ({}));
+      const input = body as Partial<Pick<CompletionRequest, "concernReason">>;
+      const reason = input.concernReason?.trim() || (body as { reason?: string }).reason?.trim();
+
+      if (!reason) {
+        return error("Concern reason is required", "completion_concern_reason_required", 422);
+      }
+
+      const timestamp = now();
+      result.completionRequest.status = "concernRaised";
+      result.completionRequest.concernReason = reason;
+      result.completionRequest.updatedAt = timestamp;
+      result.task.status = "inProgress";
+      result.task.updatedAt = timestamp;
+
+      return json({ completionRequest: result.completionRequest, task: result.task });
+    },
+  ),
 ];
+
+function getPendingCompletionRequest(taskId: string, requestId: string, currentUser: UserId) {
+  const task = tasks.find((item) => item.id === taskId);
+
+  if (!task) {
+    return { response: error("Task not found", "task_not_found", 404) };
+  }
+
+  const match = getMatchForTask(task.id, currentUser);
+
+  if (!match) {
+    return {
+      response: error(
+        "Only matched participants can act on completion requests",
+        "completion_request_forbidden",
+        403,
+      ),
+    };
+  }
+
+  const completionRequest = completionRequests.find(
+    (item) => item.id === requestId && item.taskId === task.id,
+  );
+
+  if (!completionRequest) {
+    return {
+      response: error("Completion request not found", "completion_request_not_found", 404),
+    };
+  }
+
+  if (completionRequest.status !== "pending" || task.status !== "completionRequested") {
+    return {
+      response: error(
+        "Only pending completion requests can be updated",
+        "completion_request_not_pending",
+        409,
+      ),
+    };
+  }
+
+  if (completionRequest.requestedByUserId === currentUser) {
+    return {
+      response: error(
+        "The other participant must review this completion request",
+        "completion_request_self_review",
+        403,
+      ),
+    };
+  }
+
+  if (getOtherParticipantId(match, completionRequest.requestedByUserId) !== currentUser) {
+    return {
+      response: error(
+        "Only the other matched participant can review this completion request",
+        "completion_request_reviewer_forbidden",
+        403,
+      ),
+    };
+  }
+
+  return { completionRequest, task };
+}

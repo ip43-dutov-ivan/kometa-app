@@ -2,13 +2,25 @@ import { http } from "msw";
 import { apiPath } from "../config";
 import { conversations, currentUserId, messages } from "../data";
 import type { ChatMessage } from "../types";
-import { createId, error, json, listJson, now } from "./utils";
+import {
+  createId,
+  error,
+  getPagination,
+  json,
+  pagedListJson,
+  requireActiveCurrentUser,
+  now,
+} from "./utils";
 
 export const chatHandlers = [
-  http.get(apiPath("/conversations"), () => {
-    return listJson(
-      conversations.filter((conversation) => conversation.participantIds.includes(currentUserId)),
-    );
+  http.get(apiPath("/conversations"), ({ request }) => {
+    const url = new URL(request.url);
+    const { limit, offset } = getPagination(url);
+    const result = conversations
+      .filter((conversation) => conversation.participantIds.includes(currentUserId))
+      .sort((first, second) => second.lastMessageAt.localeCompare(first.lastMessageAt));
+
+    return pagedListJson(result, limit, offset);
   }),
 
   http.get(apiPath("/conversations/:conversationId"), ({ params }) => {
@@ -21,17 +33,31 @@ export const chatHandlers = [
     return json(conversation);
   }),
 
-  http.get(apiPath("/conversations/:conversationId/messages"), ({ params }) => {
+  http.get(apiPath("/conversations/:conversationId/messages"), ({ params, request }) => {
     const conversation = conversations.find((item) => item.id === params.conversationId);
 
     if (!conversation || !conversation.participantIds.includes(currentUserId)) {
       return error("Conversation not found", "conversation_not_found", 404);
     }
 
-    return json(messages.filter((message) => message.conversationId === params.conversationId));
+    const url = new URL(request.url);
+    const before = url.searchParams.get("before");
+    const limit = Number.parseInt(url.searchParams.get("limit") ?? "50", 10);
+    const result = messages
+      .filter((message) => message.conversationId === params.conversationId)
+      .filter((message) => !before || message.createdAt < before)
+      .sort((first, second) => first.createdAt.localeCompare(second.createdAt))
+      .slice(-Math.max(1, Number.isFinite(limit) ? limit : 50));
+
+    return json(result);
   }),
 
   http.post(apiPath("/conversations/:conversationId/messages"), async ({ params, request }) => {
+    const activeUser = requireActiveCurrentUser();
+    if (activeUser.response) {
+      return activeUser.response;
+    }
+
     const conversation = conversations.find((item) => item.id === params.conversationId);
 
     if (!conversation || !conversation.participantIds.includes(currentUserId)) {

@@ -39,4 +39,18 @@ export const users: UserProfile[] = [
     accountStatus: "active",
     avatarUrl: "/placeholder-user.jpg",
   },
+  {
+    id: "user-4",
+    name: "Olena Bondar",
+    location: "Kyiv",
+    bio: "Design student who helps with portfolio reviews and small visual tasks.",
+    skills: ["Figma cleanup", "Portfolio review", "Poster layout"],
+    interests: ["visual design", "museums", "student events"],
+    rating: 4.6,
+    completedTasks: 6,
+    accountStatus: "blocked",
+    avatarUrl: "/placeholder-user.jpg",
+    blockedReason: "Repeatedly moved task coordination outside the platform after reports.",
+    blockedAt: "2026-05-04T20:00:00.000Z",
+  },
 ];
