@@ -2,6 +2,22 @@ import type { TaskResponse } from "../types";
 
 export const responses: TaskResponse[] = [
   {
+    id: "response-0",
+    taskId: "task-0",
+    providerId: "user-2",
+    comment: "I have notes from that lecture and can walk you through the tricky parts.",
+    status: "pending",
+    createdAt: "2026-04-30T10:05:00.000Z",
+  },
+  {
+    id: "response-3",
+    taskId: "task-0",
+    providerId: "user-3",
+    comment: "I can share my summary and examples from the seminar prep.",
+    status: "pending",
+    createdAt: "2026-04-30T10:40:00.000Z",
+  },
+  {
     id: "response-1",
     taskId: "task-1",
     providerId: "user-1",
@@ -16,5 +32,37 @@ export const responses: TaskResponse[] = [
     comment: "I can review the structure and pronunciation notes today.",
     status: "accepted",
     createdAt: "2026-05-02T15:05:00.000Z",
+  },
+  {
+    id: "response-4",
+    taskId: "task-4",
+    providerId: "user-2",
+    comment: "I can review the structure, screenshots, and final narrative.",
+    status: "accepted",
+    createdAt: "2026-05-03T12:35:00.000Z",
+  },
+  {
+    id: "response-5",
+    taskId: "task-5",
+    providerId: "user-1",
+    comment: "I have configured this brand before and can check dead zones after setup.",
+    status: "accepted",
+    createdAt: "2026-05-04T09:10:00.000Z",
+  },
+  {
+    id: "response-6",
+    taskId: "task-6",
+    providerId: "user-1",
+    comment: "I can explain the rules visually and share two solved examples.",
+    status: "accepted",
+    createdAt: "2026-05-04T15:00:00.000Z",
+  },
+  {
+    id: "response-7",
+    taskId: "task-3",
+    providerId: "user-1",
+    comment: "I can carry it after lunch if the pickup window is flexible.",
+    status: "declined",
+    createdAt: "2026-05-03T09:05:00.000Z",
   },
 ];

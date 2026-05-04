@@ -1,13 +1,35 @@
 export type UserId = string;
 export type TaskId = string;
 export type ResponseId = string;
+export type CompletionRequestId = string;
 export type MatchId = string;
 export type ConversationId = string;
+export type MessageId = string;
+export type FeedbackId = string;
+export type ReportId = string;
 
-export type TaskStatus = "open" | "matched" | "in_progress" | "completion_requested" | "completed";
-export type ResponseStatus = "pending" | "accepted" | "declined";
-export type CompensationType = "money" | "credits";
-export type ReportStatus = "open" | "reviewing" | "resolved";
+export type TaskStatus =
+  | "open"
+  | "matched"
+  | "inProgress"
+  | "completionRequested"
+  | "completed"
+  | "cancelled";
+export type ResponseStatus = "pending" | "accepted" | "declined" | "withdrawn";
+export type CompletionRequestStatus = "pending" | "confirmed" | "concernRaised";
+export type ReportStatus = "open" | "reviewing" | "resolved" | "dismissed";
+
+export interface PageInfo {
+  limit: number;
+  offset: number;
+  total: number;
+  hasMore: boolean;
+}
+
+export interface ListResponse<TItem> {
+  items: TItem[];
+  pageInfo: PageInfo;
+}
 
 export interface UserProfile {
   id: UserId;
@@ -18,11 +40,14 @@ export interface UserProfile {
   interests: string[];
   rating: number;
   completedTasks: number;
+  accountStatus: "active" | "blocked";
   avatarUrl?: string;
+  blockedReason?: string;
+  blockedAt?: string;
 }
 
 export interface AuthSession {
-  token: string;
+  accessToken: string;
   user: UserProfile;
 }
 
@@ -33,14 +58,15 @@ export interface Task {
   category: string;
   location: string;
   compensation: {
-    type: CompensationType;
+    type: "money";
     amount: number;
-    currency: "UAH" | "credits";
+    currency: "UAH";
   };
   status: TaskStatus;
   ownerId: UserId;
   selectedResponseId?: ResponseId;
   createdAt: string;
+  updatedAt: string;
 }
 
 export interface TaskResponse {
@@ -50,6 +76,18 @@ export interface TaskResponse {
   comment: string;
   status: ResponseStatus;
   createdAt: string;
+}
+
+export interface CompletionRequest {
+  id: CompletionRequestId;
+  taskId: TaskId;
+  requestedByUserId: UserId;
+  confirmedByUserId?: UserId;
+  status: CompletionRequestStatus;
+  note?: string;
+  concernReason?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface Match {
@@ -70,7 +108,7 @@ export interface Conversation {
 }
 
 export interface ChatMessage {
-  id: string;
+  id: MessageId;
   conversationId: ConversationId;
   senderId: UserId;
   body: string;
@@ -78,7 +116,7 @@ export interface ChatMessage {
 }
 
 export interface Feedback {
-  id: string;
+  id: FeedbackId;
   taskId: TaskId;
   authorId: UserId;
   receiverId: UserId;
@@ -88,16 +126,19 @@ export interface Feedback {
 }
 
 export interface Report {
-  id: string;
+  id: ReportId;
   reporterId: UserId;
   reportedUserId: UserId;
   taskId?: TaskId;
   reason: string;
   status: ReportStatus;
+  resolutionNote?: string;
   createdAt: string;
+  updatedAt: string;
 }
 
 export interface ApiError {
-  message: string;
   code: string;
+  message: string;
+  details?: Record<string, unknown>;
 }

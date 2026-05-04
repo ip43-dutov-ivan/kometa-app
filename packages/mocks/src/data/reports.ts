@@ -1,3 +1,45 @@
 import type { Report } from "../types";
 
-export const reports: Report[] = [];
+export const reports: Report[] = [
+  {
+    id: "report-1",
+    reporterId: "user-1",
+    reportedUserId: "user-3",
+    taskId: "task-3",
+    reason: "The response in chat felt unrelated to the task and asked to move payment elsewhere.",
+    status: "open",
+    createdAt: "2026-05-04T19:10:00.000Z",
+    updatedAt: "2026-05-04T19:10:00.000Z",
+  },
+  {
+    id: "report-2",
+    reporterId: "user-2",
+    reportedUserId: "user-4",
+    taskId: "task-4",
+    reason: "Reviewer stopped responding after asking to continue outside Kometa.",
+    status: "reviewing",
+    createdAt: "2026-05-04T19:30:00.000Z",
+    updatedAt: "2026-05-04T20:00:00.000Z",
+  },
+  {
+    id: "report-3",
+    reporterId: "user-1",
+    reportedUserId: "user-4",
+    reason: "Repeated off-platform coordination requests.",
+    status: "resolved",
+    resolutionNote: "User was blocked manually after duplicate reports.",
+    createdAt: "2026-05-03T18:15:00.000Z",
+    updatedAt: "2026-05-04T20:00:00.000Z",
+  },
+  {
+    id: "report-4",
+    reporterId: "user-3",
+    reportedUserId: "user-2",
+    taskId: "task-1",
+    reason: "Misunderstanding about task location.",
+    status: "dismissed",
+    resolutionNote: "No unsafe behavior found in the provided context.",
+    createdAt: "2026-05-02T12:00:00.000Z",
+    updatedAt: "2026-05-02T14:20:00.000Z",
+  },
+];
