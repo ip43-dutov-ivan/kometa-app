@@ -12,6 +12,7 @@ export const users: UserProfile[] = [
     interests: ["education", "technology", "local community"],
     rating: 4.8,
     completedTasks: 12,
+    accountStatus: "active",
     avatarUrl: "/placeholder-user.jpg",
   },
   {
@@ -23,6 +24,7 @@ export const users: UserProfile[] = [
     interests: ["design", "productivity", "coffee"],
     rating: 4.9,
     completedTasks: 18,
+    accountStatus: "active",
     avatarUrl: "/placeholder-user.jpg",
   },
   {
@@ -34,6 +36,7 @@ export const users: UserProfile[] = [
     interests: ["hardware", "teaching", "cycling"],
     rating: 4.7,
     completedTasks: 9,
+    accountStatus: "active",
     avatarUrl: "/placeholder-user.jpg",
   },
 ];

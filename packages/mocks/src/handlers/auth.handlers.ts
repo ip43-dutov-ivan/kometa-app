@@ -7,7 +7,7 @@ import { createId, getCurrentUser, json } from "./utils";
 export const authHandlers = [
   http.post(apiPath("/auth/login"), async () => {
     return json<AuthSession>({
-      token: "mock-access-token",
+      accessToken: "mock-access-token",
       user: getCurrentUser(),
     });
   }),
@@ -25,6 +25,7 @@ export const authHandlers = [
       interests: [],
       rating: 0,
       completedTasks: 0,
+      accountStatus: "active",
       avatarUrl: "/placeholder-user.jpg",
     };
 
@@ -32,7 +33,7 @@ export const authHandlers = [
 
     return json<AuthSession>(
       {
-        token: "mock-access-token",
+        accessToken: "mock-access-token",
         user,
       },
       { status: 201 },

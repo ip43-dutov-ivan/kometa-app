@@ -2,11 +2,11 @@ import { http } from "msw";
 import { apiPath } from "../config";
 import { currentUserId, responses, tasks } from "../data";
 import type { TaskResponse } from "../types";
-import { createId, error, json, now } from "./utils";
+import { createId, error, json, listJson, now } from "./utils";
 
 export const responseHandlers = [
   http.get(apiPath("/me/responses"), () => {
-    return json(responses.filter((response) => response.providerId === currentUserId));
+    return listJson(responses.filter((response) => response.providerId === currentUserId));
   }),
 
   http.get(apiPath("/tasks/:taskId/responses"), ({ params }) => {
@@ -16,7 +16,7 @@ export const responseHandlers = [
       return error("Task not found", "task_not_found", 404);
     }
 
-    return json(responses.filter((response) => response.taskId === params.taskId));
+    return listJson(responses.filter((response) => response.taskId === params.taskId));
   }),
 
   http.post(apiPath("/tasks/:taskId/responses"), async ({ params, request }) => {
@@ -28,6 +28,10 @@ export const responseHandlers = [
 
     if (task.ownerId === currentUserId) {
       return error("Task owners cannot respond to their own task", "own_task_response", 403);
+    }
+
+    if (task.status !== "open") {
+      return error("Only open tasks can receive responses", "task_response_not_allowed", 409);
     }
 
     const body = await request.json().catch(() => ({}));

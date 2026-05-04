@@ -2,14 +2,14 @@ import { http } from "msw";
 import { apiPath } from "../config";
 import { conversations, matches, responses, tasks } from "../data";
 import type { Conversation, Match } from "../types";
-import { createId, error, json, now } from "./utils";
+import { createId, error, json, listJson, now } from "./utils";
 
 export const matchHandlers = [
   http.get(apiPath("/matches"), () => {
-    return json(matches);
+    return listJson(matches);
   }),
 
-  http.post(apiPath("/responses/:responseId/select"), ({ params }) => {
+  http.post(apiPath("/tasks/:taskId/responses/:responseId/accept"), ({ params }) => {
     const response = responses.find((item) => item.id === params.responseId);
 
     if (!response) {

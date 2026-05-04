@@ -30,4 +30,8 @@ export const feedbackHandlers = [
 
     return json(item, { status: 201 });
   }),
+
+  http.get(apiPath("/tasks/:taskId/feedback"), ({ params }) => {
+    return json(feedback.filter((item) => item.taskId === params.taskId));
+  }),
 ];

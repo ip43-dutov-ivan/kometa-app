@@ -2,13 +2,23 @@ import { http } from "msw";
 import { apiPath } from "../config";
 import { conversations, currentUserId, messages } from "../data";
 import type { ChatMessage } from "../types";
-import { createId, error, json, now } from "./utils";
+import { createId, error, json, listJson, now } from "./utils";
 
 export const chatHandlers = [
   http.get(apiPath("/conversations"), () => {
-    return json(
+    return listJson(
       conversations.filter((conversation) => conversation.participantIds.includes(currentUserId)),
     );
+  }),
+
+  http.get(apiPath("/conversations/:conversationId"), ({ params }) => {
+    const conversation = conversations.find((item) => item.id === params.conversationId);
+
+    if (!conversation || !conversation.participantIds.includes(currentUserId)) {
+      return error("Conversation not found", "conversation_not_found", 404);
+    }
+
+    return json(conversation);
   }),
 
   http.get(apiPath("/conversations/:conversationId/messages"), ({ params }) => {

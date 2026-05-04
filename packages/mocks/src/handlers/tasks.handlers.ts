@@ -1,32 +1,57 @@
 import { http } from "msw";
 import { apiPath } from "../config";
-import { currentUserId, tasks } from "../data";
+import { currentUserId, responses, tasks } from "../data";
 import type { Task, TaskStatus } from "../types";
-import { createId, error, json, now } from "./utils";
+import { createId, error, json, listJson, now } from "./utils";
 
 export const taskHandlers = [
   http.get(apiPath("/tasks"), ({ request }) => {
     const url = new URL(request.url);
     const status = url.searchParams.get("status") as TaskStatus | null;
-    const mine = url.searchParams.get("mine");
+    const owner = url.searchParams.get("owner");
+    const involved = url.searchParams.get("involved");
+    const available = url.searchParams.get("available");
+    const category = url.searchParams.get("category")?.toLocaleLowerCase();
+    const location = url.searchParams.get("location")?.toLocaleLowerCase();
 
     const result = tasks.filter((task) => {
       if (status && task.status !== status) {
         return false;
       }
 
-      if (mine === "created" && task.ownerId !== currentUserId) {
+      if (owner === "me" && task.ownerId !== currentUserId) {
         return false;
       }
 
-      if (mine === "available" && task.ownerId === currentUserId) {
+      if (involved === "me") {
+        const isAcceptedProvider = responses.some(
+          (response) =>
+            response.taskId === task.id &&
+            response.providerId === currentUserId &&
+            response.status === "accepted",
+        );
+
+        if (task.ownerId !== currentUserId && !isAcceptedProvider) {
+          return false;
+        }
+      }
+
+      if (available === "true" && task.ownerId === currentUserId) {
+        return false;
+      }
+
+      if (category && !task.category.toLocaleLowerCase().includes(category)) {
+        return false;
+      }
+
+      if (location && !task.location.toLocaleLowerCase().includes(location)) {
         return false;
       }
 
       return true;
     });
 
-    return json(result);
+    return listJson(result);
   }),
 
   http.post(apiPath("/tasks"), async ({ request }) => {
@@ -43,6 +68,7 @@ export const taskHandlers = [
       status: "open",
       ownerId: currentUserId,
       createdAt: now(),
+      updatedAt: now(),
     };
 
     tasks.unshift(task);
@@ -67,8 +93,25 @@ export const taskHandlers = [
       return error("Task not found", "task_not_found", 404);
     }
 
+    if (task.ownerId !== currentUserId) {
+      return error("Only the task owner can update this task", "task_update_forbidden", 403);
+    }
+
+    if (task.status !== "open") {
+      return error("Only open tasks can be updated", "task_not_editable", 409);
+    }
+
     const body = await request.json().catch(() => ({}));
-    Object.assign(task, body);
+    const input = body as Partial<Task>;
+
+    Object.assign(task, {
+      title: input.title?.trim() || task.title,
+      description: input.description?.trim() || task.description,
+      category: input.category?.trim() || task.category,
+      location: input.location?.trim() || task.location,
+      compensation: input.compensation ?? task.compensation,
+      updatedAt: now(),
+    });
 
     return json(task);
   }),

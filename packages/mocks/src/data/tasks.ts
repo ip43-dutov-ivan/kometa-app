@@ -2,6 +2,19 @@ import type { Task } from "../types";
 
 export const tasks: Task[] = [
   {
+    id: "task-0",
+    title: "Find notes for a missed database lecture",
+    description:
+      "I missed Monday's database systems lecture and need clean notes or a quick walkthrough before the seminar.",
+    category: "Education",
+    location: "Kyiv, KPI",
+    compensation: { type: "money", amount: 200, currency: "UAH" },
+    status: "open",
+    ownerId: "user-1",
+    createdAt: "2026-04-30T09:20:00.000Z",
+    updatedAt: "2026-04-30T09:20:00.000Z",
+  },
+  {
     id: "task-1",
     title: "Help set up a Wi-Fi router",
     description: "Need help configuring a new router and checking coverage in a small apartment.",
@@ -11,6 +24,7 @@ export const tasks: Task[] = [
     status: "open",
     ownerId: "user-2",
     createdAt: "2026-05-01T10:00:00.000Z",
+    updatedAt: "2026-05-01T10:00:00.000Z",
   },
   {
     id: "task-2",
@@ -23,6 +37,7 @@ export const tasks: Task[] = [
     ownerId: "user-1",
     selectedResponseId: "response-2",
     createdAt: "2026-05-02T14:30:00.000Z",
+    updatedAt: "2026-05-02T14:30:00.000Z",
   },
   {
     id: "task-3",
@@ -34,5 +49,6 @@ export const tasks: Task[] = [
     status: "open",
     ownerId: "user-3",
     createdAt: "2026-05-03T08:45:00.000Z",
+    updatedAt: "2026-05-03T08:45:00.000Z",
   },
 ];

@@ -2,7 +2,7 @@ import { http } from "msw";
 import { apiPath } from "../config";
 import { feedback, users } from "../data";
 import type { UserProfile } from "../types";
-import { error, getCurrentUser, json } from "./utils";
+import { error, getCurrentUser, json, listJson } from "./utils";
 
 export const profileHandlers = [
   http.get(apiPath("/users/me"), () => {
@@ -38,6 +38,6 @@ export const profileHandlers = [
   }),
 
   http.get(apiPath("/users/:userId/feedback"), ({ params }) => {
-    return json(feedback.filter((item) => item.receiverId === params.userId));
+    return listJson(feedback.filter((item) => item.receiverId === params.userId));
   }),
 ];

@@ -21,6 +21,7 @@ export const reportHandlers = [
       reason: input.reason?.trim() || "No reason provided.",
       status: "open",
       createdAt: now(),
+      updatedAt: now(),
     };
 
     reports.unshift(report);
