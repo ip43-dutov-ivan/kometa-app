@@ -3,7 +3,16 @@
 import { ReactNode, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { ClipboardList, Compass, Home, LogOut, UserRound } from "lucide-react";
+import {
+  ClipboardList,
+  Compass,
+  Home,
+  Inbox,
+  LogOut,
+  MessageSquare,
+  UserRound,
+  UsersRound,
+} from "lucide-react";
 import { kometaApi } from "@/shared/api/client";
 import { LoadingState } from "@/shared/components/page-state";
 import { useKometaSession } from "@/shared/session/use-kometa-session";
@@ -14,6 +23,9 @@ const navItems = [
   { href: "/app", label: "Home", icon: Home },
   { href: "/app/tasks", label: "Discover", icon: Compass },
   { href: "/app/my-tasks", label: "My tasks", icon: ClipboardList },
+  { href: "/app/my-responses", label: "Responses", icon: Inbox },
+  { href: "/app/matches", label: "Matches", icon: UsersRound },
+  { href: "/app/conversations", label: "Chat", icon: MessageSquare },
   { href: "/app/profile", label: "Profile", icon: UserRound },
 ];
 
@@ -71,7 +83,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             </Button>
           </div>
         </div>
-        <nav className="mx-auto grid w-full max-w-6xl grid-cols-4 gap-1 px-2 pb-2 md:hidden">
+        <nav className="mx-auto flex w-full max-w-6xl gap-1 overflow-x-auto px-2 pb-2 md:hidden">
           {navItems.map((item) => (
             <Button
               key={item.href}

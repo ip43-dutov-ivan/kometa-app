@@ -1,7 +1,8 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import { Save, Star } from "lucide-react";
+import Link from "next/link";
+import { Save, ShieldAlert, Star } from "lucide-react";
 import { toUpdateCurrentUserRequest } from "@kometa/logic";
 import type { User } from "@kometa/logic";
 import { kometaApi } from "@/shared/api/client";
@@ -149,6 +150,110 @@ export function ProfilePage() {
         </div>
         <TagGroup label="Skills" items={profile.skills} />
         <TagGroup label="Interests" items={profile.interests} />
+      </aside>
+    </div>
+  );
+}
+
+export function PublicProfilePage({ userId }: { userId: string }) {
+  const [profile, setProfile] = useState<User | null>(null);
+  const [feedback, setFeedback] = useState<Array<{ id: string; rating: number; comment: string }>>(
+    [],
+  );
+  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    let isActive = true;
+
+    async function loadProfile() {
+      try {
+        const [nextProfile, feedbackResponse] = await Promise.all([
+          kometaApi.users.getById(userId),
+          kometaApi.users.listFeedback(userId),
+        ]);
+        if (isActive) {
+          setProfile(nextProfile);
+          setFeedback(feedbackResponse.items);
+        }
+      } catch (caughtError) {
+        if (isActive) {
+          setError(caughtError instanceof Error ? caughtError.message : "Profile failed to load.");
+        }
+      } finally {
+        if (isActive) {
+          setIsLoading(false);
+        }
+      }
+    }
+
+    loadProfile();
+    return () => {
+      isActive = false;
+    };
+  }, [userId]);
+
+  if (isLoading) {
+    return <LoadingState label="Loading profile" />;
+  }
+
+  if (!profile) {
+    return <ErrorState message={error ?? "Profile is unavailable."} />;
+  }
+
+  return (
+    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+      <section className="grid gap-5">
+        <div>
+          <h1 className="font-heading text-3xl font-semibold">{profile.name}</h1>
+          <p className="mt-2 text-muted-foreground">{profile.location}</p>
+        </div>
+        <Card className="rounded-lg">
+          <CardHeader>
+            <CardTitle>About</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-4">
+            <p className="leading-7">{profile.bio}</p>
+            <TagGroup label="Skills" items={profile.skills} />
+            <TagGroup label="Interests" items={profile.interests} />
+          </CardContent>
+        </Card>
+        <Card className="rounded-lg">
+          <CardHeader>
+            <CardTitle>Feedback</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-3">
+            {feedback.length ? (
+              feedback.map((item) => (
+                <div key={item.id} className="rounded-lg border p-3">
+                  <div className="mb-1 flex items-center gap-2 text-sm font-medium">
+                    <Star className="size-4 text-primary" />
+                    {item.rating}/5
+                  </div>
+                  <p className="text-sm leading-6 text-muted-foreground">{item.comment}</p>
+                </div>
+              ))
+            ) : (
+              <p className="text-sm text-muted-foreground">No feedback yet.</p>
+            )}
+          </CardContent>
+        </Card>
+      </section>
+      <aside className="grid h-fit gap-4 rounded-lg border p-5">
+        <div className="flex items-center gap-2 text-sm">
+          <Star className="size-4 text-primary" />
+          {profile.rating.toFixed(1)} rating
+        </div>
+        <p className="text-sm text-muted-foreground">{profile.completedTasks} completed tasks</p>
+        <Badge className="w-fit" variant="outline">
+          {profile.accountStatus}
+        </Badge>
+        <Button asChild variant="outline">
+          <Link href={`/app/reports/new?reportedUserId=${profile.id}`}>
+            <ShieldAlert />
+            Report user
+          </Link>
+        </Button>
       </aside>
     </div>
   );
