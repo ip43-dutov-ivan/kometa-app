@@ -1,0 +1,25 @@
+{
+  "name": "@kometa/mocks",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./handlers": "./src/handlers/index.ts",
+    "./data": "./src/data/index.ts",
+    "./scenarios": "./src/scenarios/index.ts"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier . --write --ignore-unknown",
+    "format:check": "prettier . --check --ignore-unknown",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "msw": "^2.13.4"
+  },
+  "devDependencies": {
+    "typescript": "5.7.3"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "name": "@kometa/assets",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./logo.svg": "./logo.svg",
+    "./fonts/SpaceGrotesk-VariableFont_wght.ttf": "./fonts/SpaceGrotesk-VariableFont_wght.ttf"
+  }
+}
