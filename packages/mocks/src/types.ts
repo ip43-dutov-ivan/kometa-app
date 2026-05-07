@@ -48,6 +48,7 @@ export interface UserProfile {
 
 export interface AuthSession {
   accessToken: string;
+  refreshToken: string;
   user: UserProfile;
 }
 

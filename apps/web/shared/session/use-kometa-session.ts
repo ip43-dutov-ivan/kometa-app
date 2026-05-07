@@ -24,9 +24,10 @@ export function useKometaSession() {
     }
 
     const storedSession = readStoredSession();
-    if (storedSession?.accessToken && storedSession.user) {
+    if (storedSession?.accessToken && storedSession.refreshToken && storedSession.user) {
       kometaSessionStore.getState().setSession({
         accessToken: storedSession.accessToken,
+        refreshToken: storedSession.refreshToken,
         user: storedSession.user,
       });
     }
@@ -36,7 +37,11 @@ export function useKometaSession() {
 
   const setSession = useCallback((session: AuthSession) => {
     kometaSessionStore.getState().setSession(session);
-    writeStoredSession({ accessToken: session.accessToken, user: session.user });
+    writeStoredSession({
+      accessToken: session.accessToken,
+      refreshToken: session.refreshToken,
+      user: session.user,
+    });
   }, []);
 
   const clearSession = useCallback(() => {
@@ -47,8 +52,9 @@ export function useKometaSession() {
   const setUser = useCallback((nextUser: NonNullable<typeof user>) => {
     kometaSessionStore.getState().setUser(nextUser);
     const accessToken = kometaSessionStore.getState().accessToken;
-    if (accessToken) {
-      writeStoredSession({ accessToken, user: nextUser });
+    const refreshToken = kometaSessionStore.getState().refreshToken;
+    if (accessToken && refreshToken) {
+      writeStoredSession({ accessToken, refreshToken, user: nextUser });
     }
   }, []);
 

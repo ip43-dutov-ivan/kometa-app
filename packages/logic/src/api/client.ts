@@ -27,6 +27,8 @@ import type {
   Report,
   ReportId,
   RequestCompletionRequest,
+  RefreshSessionRequest,
+  RefreshSessionResponse,
   ResponseId,
   SendMessageRequest,
   Task,
@@ -47,6 +49,7 @@ export interface KometaApiClientOptions {
   baseUrl?: string;
   accessToken?: string;
   getAccessToken?: () => string | null | undefined | Promise<string | null | undefined>;
+  refreshAccessToken?: () => string | null | undefined | Promise<string | null | undefined>;
   fetchFn?: typeof fetch;
   defaultHeaders?: HeadersInit;
 }
@@ -80,6 +83,10 @@ export interface KometaApiClient {
   auth: {
     register: (body: RegisterRequest, options?: KometaRequestOptions) => Promise<AuthSession>;
     login: (body: LoginRequest, options?: KometaRequestOptions) => Promise<AuthSession>;
+    refresh: (
+      body: RefreshSessionRequest,
+      options?: KometaRequestOptions,
+    ) => Promise<RefreshSessionResponse>;
     logout: (options?: KometaRequestOptions) => Promise<void>;
   };
   users: {
@@ -214,6 +221,28 @@ export function createKometaApiClient(options: KometaApiClientOptions = {}): Kom
       headers: buildHeaders(options.defaultHeaders, init.headers, token),
     });
 
+    if (response.status === 401 && options.refreshAccessToken) {
+      const refreshedToken = await options.refreshAccessToken();
+
+      if (refreshedToken && refreshedToken !== token) {
+        const retryResponse = await fetchImpl(`${baseUrl}${path}`, {
+          ...init,
+          signal: requestOptions.signal ?? init.signal,
+          headers: buildHeaders(options.defaultHeaders, init.headers, refreshedToken),
+        });
+
+        if (retryResponse.ok) {
+          if (retryResponse.status === 204) {
+            return undefined as TResponse;
+          }
+
+          return (await retryResponse.json()) as TResponse;
+        }
+
+        throw new KometaApiError(retryResponse.status, await readError(retryResponse));
+      }
+    }
+
     if (!response.ok) {
       throw new KometaApiError(response.status, await readError(response));
     }
@@ -245,6 +274,7 @@ export function createKometaApiClient(options: KometaApiClientOptions = {}): Kom
     auth: {
       register: (body, options) => post<AuthSession>("/auth/register", body, options),
       login: (body, options) => post<AuthSession>("/auth/login", body, options),
+      refresh: (body, options) => post<RefreshSessionResponse>("/auth/refresh", body, options),
       logout: (options) => post<void>("/auth/logout", undefined, options),
     },
     users: {

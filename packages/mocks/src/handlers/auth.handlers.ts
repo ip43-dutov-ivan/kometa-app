@@ -8,6 +8,7 @@ export const authHandlers = [
   http.post(apiPath("/auth/login"), async () => {
     return json<AuthSession>({
       accessToken: "mock-access-token",
+      refreshToken: "mock-refresh-token",
       user: getCurrentUser(),
     });
   }),
@@ -34,10 +35,21 @@ export const authHandlers = [
     return json<AuthSession>(
       {
         accessToken: "mock-access-token",
+        refreshToken: "mock-refresh-token",
         user,
       },
       { status: 201 },
     );
+  }),
+
+  http.post(apiPath("/auth/refresh"), async ({ request }) => {
+    const body = (await request.json().catch(() => ({}))) as { refreshToken?: string };
+
+    if (!body.refreshToken) {
+      return json({ refreshToken: ["This field is required."] }, { status: 400 });
+    }
+
+    return json({ accessToken: "mock-access-token" });
   }),
 
   http.post(apiPath("/auth/logout"), () => {

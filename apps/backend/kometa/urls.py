@@ -1,6 +1,6 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views.auth import register, login, logout
+from .views.auth import register, login, logout, refresh
 from .views.users import UserViewSet
 from .views.conversations import ConversationViewSet, ConversationMessageViewSet
 from .views.completion_requests import CompletionRequestViewSet
@@ -23,6 +23,7 @@ urlpatterns = [
     # Auth
     path('auth/register', register, name='register'),
     path('auth/login', login, name='login'),
+    path('auth/refresh', refresh, name='refresh'),
     path('auth/logout', logout, name='logout'),
 
     # Users & Tasks

@@ -143,7 +143,16 @@ export interface Report {
 
 export interface AuthSession {
   accessToken: string;
+  refreshToken: string;
   user: User;
+}
+
+export interface RefreshSessionRequest {
+  refreshToken: string;
+}
+
+export interface RefreshSessionResponse {
+  accessToken: string;
 }
 
 export interface RegisterRequest {
