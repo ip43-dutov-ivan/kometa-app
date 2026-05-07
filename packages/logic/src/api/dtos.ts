@@ -8,11 +8,7 @@ export type MessageId = string;
 export type FeedbackId = string;
 export type ReportId = string;
 
-export interface ApiErrorDto {
-  code: string;
-  message: string;
-  details?: Record<string, unknown>;
-}
+export type { ApiErrorDto } from "./errors";
 
 export interface PageInfo {
   limit: number;

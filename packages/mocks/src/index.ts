@@ -2,6 +2,7 @@ export { API_BASE_PATH, apiPath } from "./config";
 export * from "./data";
 export { handlers } from "./handlers";
 export {
+  authValidationErrorHandlers,
   blockedAccountHandlers,
   emptyStateHandlers,
   routeEmptyStateHandlers,

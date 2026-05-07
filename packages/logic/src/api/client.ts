@@ -1,5 +1,4 @@
 import type {
-  ApiErrorDto,
   AuthSession,
   BlockUserRequest,
   BlockUserResponse,
@@ -41,6 +40,8 @@ import type {
   UserFeedbackQuery,
   UserId,
 } from "./dtos";
+import type { ApiErrorDto, KometaApiErrorDetails } from "./errors";
+import { parseApiErrorDetails } from "./errors";
 
 export interface KometaApiClientOptions {
   baseUrl?: string;
@@ -61,12 +62,17 @@ type QueryParams = object;
 export class KometaApiError extends Error {
   readonly status: number;
   readonly data?: ApiErrorDto;
+  readonly details: KometaApiErrorDetails;
+  readonly rawData?: unknown;
 
-  constructor(status: number, data?: ApiErrorDto) {
-    super(data?.message ?? `Kometa API request failed with status ${status}`);
+  constructor(status: number, data?: unknown) {
+    const details = parseApiErrorDetails(data, `Kometa API request failed with status ${status}`);
+    super(details.message);
     this.name = "KometaApiError";
     this.status = status;
-    this.data = data;
+    this.data = data as ApiErrorDto | undefined;
+    this.details = details;
+    this.rawData = data;
   }
 }
 
@@ -388,9 +394,9 @@ function isQueryValue(value: unknown): value is Exclude<QueryValue, null | undef
   return valueType === "string" || valueType === "number" || valueType === "boolean";
 }
 
-async function readError(response: Response): Promise<ApiErrorDto | undefined> {
+async function readError(response: Response): Promise<unknown> {
   try {
-    return (await response.json()) as ApiErrorDto;
+    return await response.json();
   } catch (_error) {
     return undefined;
   }

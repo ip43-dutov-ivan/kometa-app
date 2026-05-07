@@ -4,6 +4,7 @@ import { createKometaApiClient } from "@kometa/logic";
 import { kometaSessionStore } from "@kometa/logic";
 
 export const KOMETA_SESSION_STORAGE_KEY = "kometa.session.v1";
+const KOMETA_API_BASE_URL = process.env.NEXT_PUBLIC_KOMETA_API_BASE_URL ?? "/api/v1";
 
 export function getStoredAccessToken(): string | null {
   if (typeof window === "undefined") {
@@ -14,8 +15,12 @@ export function getStoredAccessToken(): string | null {
 }
 
 export const kometaApi = createKometaApiClient({
-  baseUrl: process.env.NEXT_PUBLIC_KOMETA_API_BASE_URL ?? "/api/v1",
+  baseUrl: KOMETA_API_BASE_URL,
   getAccessToken: getStoredAccessToken,
+});
+
+export const kometaUnauthenticatedApi = createKometaApiClient({
+  baseUrl: KOMETA_API_BASE_URL,
 });
 
 export interface StoredSession {

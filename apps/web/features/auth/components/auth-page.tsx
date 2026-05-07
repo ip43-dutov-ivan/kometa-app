@@ -3,8 +3,9 @@
 import { FormEvent, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { getApiErrorMessage, getApiFieldErrors, getApiNonFieldErrors } from "@kometa/logic";
 import { LogIn, UserPlus } from "lucide-react";
-import { kometaApi } from "@/shared/api/client";
+import { kometaUnauthenticatedApi } from "@/shared/api/client";
 import { ErrorState } from "@/shared/components/page-state";
 import { useKometaSession } from "@/shared/session/use-kometa-session";
 import { Button } from "@/components/ui/button";
@@ -19,26 +20,28 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
   const router = useRouter();
   const { setSession } = useKometaSession();
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isRegister = mode === "register";
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
+    setFieldErrors({});
     setIsSubmitting(true);
 
     const formData = new FormData(event.currentTarget);
 
     try {
       const session = isRegister
-        ? await kometaApi.auth.register({
+        ? await kometaUnauthenticatedApi.auth.register({
             email: String(formData.get("email") ?? ""),
             password: String(formData.get("password") ?? ""),
             name: String(formData.get("name") ?? ""),
             location: String(formData.get("location") ?? ""),
             bio: String(formData.get("bio") ?? ""),
           })
-        : await kometaApi.auth.login({
+        : await kometaUnauthenticatedApi.auth.login({
             email: String(formData.get("email") ?? ""),
             password: String(formData.get("password") ?? ""),
           });
@@ -46,7 +49,16 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
       setSession(session);
       router.push("/app");
     } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : "Authentication failed.");
+      const nextFieldErrors = getApiFieldErrors(caughtError);
+      const hasFieldErrors = Object.keys(nextFieldErrors).length > 0;
+      const hasNonFieldErrors = getApiNonFieldErrors(caughtError).length > 0;
+
+      setError(
+        hasFieldErrors && !hasNonFieldErrors
+          ? null
+          : getApiErrorMessage(caughtError, "Authentication failed."),
+      );
+      setFieldErrors(nextFieldErrors);
     } finally {
       setIsSubmitting(false);
     }
@@ -73,6 +85,7 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
               <div className="grid gap-2">
                 <Label htmlFor="email">Email</Label>
                 <Input id="email" name="email" type="email" autoComplete="email" required />
+                <FieldError messages={fieldErrors.email} />
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="password">Password</Label>
@@ -83,20 +96,24 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
                   autoComplete={isRegister ? "new-password" : "current-password"}
                   required
                 />
+                <FieldError messages={fieldErrors.password} />
               </div>
               {isRegister ? (
                 <>
                   <div className="grid gap-2">
                     <Label htmlFor="name">Name</Label>
                     <Input id="name" name="name" autoComplete="name" required />
+                    <FieldError messages={fieldErrors.name} />
                   </div>
                   <div className="grid gap-2">
                     <Label htmlFor="location">Location</Label>
                     <Input id="location" name="location" autoComplete="address-level2" required />
+                    <FieldError messages={fieldErrors.location} />
                   </div>
                   <div className="grid gap-2">
                     <Label htmlFor="bio">Bio</Label>
                     <Textarea id="bio" name="bio" rows={4} required />
+                    <FieldError messages={fieldErrors.bio} />
                   </div>
                 </>
               ) : null}
@@ -116,4 +133,12 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
       </div>
     </main>
   );
+}
+
+function FieldError({ messages }: { messages?: string[] }) {
+  if (!messages?.length) {
+    return null;
+  }
+
+  return <p className="text-sm text-destructive">{messages.join(" ")}</p>;
 }
