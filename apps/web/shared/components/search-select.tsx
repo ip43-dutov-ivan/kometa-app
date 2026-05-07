@@ -62,9 +62,15 @@ export function SearchSelect<TItem>({
           role="combobox"
           aria-expanded={open}
           disabled={disabled}
-          className={cn("w-full justify-between px-3 font-normal", className)}
+          className={cn("group w-full justify-between px-3 font-normal", className)}
         >
-          <span className={cn("truncate", !selectedItem && "text-muted-foreground")}>
+          <span
+            className={cn(
+              "truncate",
+              !selectedItem &&
+                "text-muted-foreground group-hover:text-black group-focus-visible:text-black",
+            )}
+          >
             {selectedItem ? getItemLabel(selectedItem) : placeholder}
           </span>
           <ChevronsUpDown className="opacity-50" />
