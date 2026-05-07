@@ -17,6 +17,8 @@ class User(AbstractUser):
         default='active'
     )
     avatar_url = models.URLField(blank=True)
+    blocked_reason = models.TextField(blank=True)
+    blocked_at = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
         return self.name
@@ -209,3 +211,42 @@ class Match(models.Model):
 
     def __str__(self):
         return f'Match for task {self.task_id} between {self.owner_id} and {self.provider_id}'
+
+
+class Report(models.Model):
+    REPORT_STATUS_CHOICES = [
+        ('open', 'Open'),
+        ('reviewing', 'Reviewing'),
+        ('resolved', 'Resolved'),
+        ('dismissed', 'Dismissed'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    reporter = models.ForeignKey(
+        User,
+        related_name='reports_filed',
+        on_delete=models.CASCADE,
+    )
+    reported_user = models.ForeignKey(
+        User,
+        related_name='reports_received',
+        on_delete=models.CASCADE,
+    )
+    task = models.ForeignKey(
+        Task,
+        null=True,
+        blank=True,
+        related_name='reports',
+        on_delete=models.SET_NULL,
+    )
+    reason = models.TextField()
+    status = models.CharField(max_length=20, choices=REPORT_STATUS_CHOICES, default='open')
+    resolution_note = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'Report by {self.reporter_id} on {self.reported_user_id}'

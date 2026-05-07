@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 from django.contrib.auth import authenticate
-from .models import CompletionRequest, Conversation, ConversationMessage, Feedback, Match, Task, TaskResponse, User
+from .models import CompletionRequest, Conversation, ConversationMessage, Feedback, Match, Report, Task, TaskResponse, User
 
 class UserSerializer(serializers.ModelSerializer):
     completedTasks = serializers.IntegerField(source='completed_tasks', read_only=True)
@@ -176,3 +176,33 @@ class MatchSerializer(serializers.ModelSerializer):
             'id', 'taskId', 'responseId', 'ownerId', 'providerId', 'conversationId', 'createdAt'
         ]
         read_only_fields = ['id', 'taskId', 'responseId', 'ownerId', 'providerId', 'conversationId', 'createdAt']
+
+
+class ReportSerializer(serializers.ModelSerializer):
+    reporterId = serializers.CharField(source='reporter_id', read_only=True)
+    reportedUserId = serializers.CharField(source='reported_user_id', required=False)
+    taskId = serializers.CharField(source='task_id', allow_null=True, required=False)
+    reason = serializers.CharField(required=False)
+    resolutionNote = serializers.CharField(source='resolution_note', allow_blank=True, required=False)
+    createdAt = serializers.DateTimeField(source='created_at', read_only=True)
+    updatedAt = serializers.DateTimeField(source='updated_at', read_only=True)
+
+    class Meta:
+        model = Report
+        fields = [
+            'id', 'reporterId', 'reportedUserId', 'taskId', 'reason', 'status',
+            'resolutionNote', 'createdAt', 'updatedAt'
+        ]
+        read_only_fields = ['id', 'reporterId', 'createdAt', 'updatedAt']
+
+    def validate(self, data):
+        if self.instance is None:  # create
+            if 'reported_user_id' not in data:
+                raise serializers.ValidationError({'reportedUserId': 'This field is required.'})
+            if 'reason' not in data:
+                raise serializers.ValidationError({'reason': 'This field is required.'})
+        return data
+
+    def create(self, validated_data):
+        validated_data['reporter'] = self.context['request'].user
+        return super().create(validated_data)

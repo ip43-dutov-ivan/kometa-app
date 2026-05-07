@@ -56,3 +56,35 @@ class UserViewSet(ModelViewSet):
                 'hasMore': offset + limit < total,
             },
         })
+
+    @action(detail=True, methods=['post'], url_path='block')
+    def block(self, request, pk=None):
+        if not request.user.is_staff:
+            return Response(
+                {'detail': 'Admin access required.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        user = self.get_object()
+        reason = request.data.get('reason', '')
+        user.account_status = 'blocked'
+        user.blocked_reason = reason
+        from django.utils import timezone
+        user.blocked_at = timezone.now()
+        user.save()
+        serializer = UserSerializer(user)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['post'], url_path='unblock')
+    def unblock(self, request, pk=None):
+        if not request.user.is_staff:
+            return Response(
+                {'detail': 'Admin access required.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        user = self.get_object()
+        user.account_status = 'active'
+        user.blocked_reason = ''
+        user.blocked_at = None
+        user.save()
+        serializer = UserSerializer(user)
+        return Response(serializer.data)

@@ -50,10 +50,23 @@ provider2, _ = User.objects.get_or_create(
 provider2.set_password('testpass123')
 provider2.save()
 
+admin_user, _ = User.objects.get_or_create(
+    username='admin@example.com',
+    defaults={
+        'email': 'admin@example.com',
+        'name': 'Admin User',
+        'location': 'Admin City',
+        'is_staff': True,
+    }
+)
+admin_user.set_password('testpass123')
+admin_user.save()
+
 # Generate JWT tokens
 owner_token = str(RefreshToken.for_user(task_owner).access_token)
 provider1_token = str(RefreshToken.for_user(provider1).access_token)
 provider2_token = str(RefreshToken.for_user(provider2).access_token)
+admin_token = str(RefreshToken.for_user(admin_user).access_token)
 
 # Create a task
 print("=== Creating Task ===")
@@ -257,6 +270,60 @@ if response.status_code == 201:
     )
     print(f"Status: {response.status_code}")
     print(f"Response: {response.json()}\n")
+
+    # Provider reports the owner
+    print("=== Provider Creates Report ===")
+    response = client.post(
+        '/api/v1/reports/',
+        {
+            'reportedUserId': str(task_owner.id),
+            'taskId': task_id,
+            'reason': 'Unsafe behavior during task coordination.'
+        },
+        HTTP_AUTHORIZATION=f'Bearer {provider1_token}',
+        format='json'
+    )
+    print(f"Status: {response.status_code}")
+    if response.status_code == 201:
+        report_id = response.json()['id']
+        print(f"Report ID: {report_id}")
+        print(f"Report: {response.json()}\n")
+
+        # Admin lists reports
+        print("=== Admin Lists Reports ===")
+        response = client.get(
+            '/api/v1/admin/reports/?status=open&limit=20&offset=0',
+            HTTP_AUTHORIZATION=f'Bearer {admin_token}',
+        )
+        print(f"Status: {response.status_code}")
+        print(f"Response: {response.json()}\n")
+
+        # Admin resolves the report
+        print("=== Admin Resolves Report ===")
+        response = client.patch(
+            f'/api/v1/admin/reports/{report_id}/',
+            {
+                'status': 'resolved',
+                'resolutionNote': 'Handled manually.'
+            },
+            HTTP_AUTHORIZATION=f'Bearer {admin_token}',
+            format='json'
+        )
+        print(f"Status: {response.status_code}")
+        print(f"Response: {response.json()}\n")
+
+        # Admin blocks the owner
+        print("=== Admin Blocks Owner ===")
+        response = client.post(
+            f'/api/v1/admin/users/{task_owner.id}/block/',
+            {'reason': 'Repeated unsafe behavior.'},
+            HTTP_AUTHORIZATION=f'Bearer {admin_token}',
+            format='json'
+        )
+        print(f"Status: {response.status_code}")
+        print(f"Response: {response.json()}\n")
+    else:
+        print(f"Error: {response.json()}\n")
 else:
     print(f"Error: {response.json()}\n")
 

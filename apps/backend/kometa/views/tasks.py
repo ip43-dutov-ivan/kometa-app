@@ -5,8 +5,8 @@ from rest_framework.viewsets import ModelViewSet
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from django.db.models import Q
-from ..models import Task, TaskResponse, CompletionRequest, Conversation, Feedback, Match
-from ..serializers import TaskSerializer, TaskResponseSerializer, CompletionRequestSerializer, FeedbackSerializer, MatchSerializer
+from ..models import Task, TaskResponse, CompletionRequest, Conversation, Feedback, Match, Report
+from ..serializers import TaskSerializer, TaskResponseSerializer, CompletionRequestSerializer, FeedbackSerializer, MatchSerializer, ReportSerializer
 
 
 class TaskViewSet(ModelViewSet):
@@ -588,3 +588,69 @@ class CompletionRequestViewSet(ModelViewSet):
             'completionRequest': serializer.data,
             'task': task_serializer.data,
         })
+
+
+class ReportViewSet(ModelViewSet):
+    queryset = Report.objects.all()
+    serializer_class = ReportSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        if not self.request.user.is_staff:
+            # Non-admin can only see their own reports
+            return Report.objects.filter(reporter=self.request.user)
+        # Admin can see all
+        queryset = Report.objects.all()
+        status_param = self.request.query_params.get('status', None)
+        if status_param:
+            queryset = queryset.filter(status=status_param)
+        return queryset
+
+    def list(self, request, *args, **kwargs):
+        if not request.user.is_staff:
+            return Response(
+                {'detail': 'Admin access required.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        queryset = self.get_queryset()
+        total = queryset.count()
+
+        try:
+            limit = int(request.query_params.get('limit', 20))
+        except (TypeError, ValueError):
+            limit = 20
+        try:
+            offset = int(request.query_params.get('offset', 0))
+        except (TypeError, ValueError):
+            offset = 0
+
+        limit = max(1, min(limit, 100))
+        offset = max(0, offset)
+
+        items = queryset[offset:offset + limit]
+        serializer = self.get_serializer(items, many=True)
+
+        return Response({
+            'items': serializer.data,
+            'pageInfo': {
+                'limit': limit,
+                'offset': offset,
+                'total': total,
+                'hasMore': offset + limit < total,
+            },
+        })
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        if serializer.is_valid():
+            report = serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def update(self, request, *args, **kwargs):
+        if not request.user.is_staff:
+            return Response(
+                {'detail': 'Admin access required.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        return super().update(request, *args, **kwargs)
