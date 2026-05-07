@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 from django.contrib.auth import authenticate
-from .models import Feedback, User
+from .models import CompletionRequest, Feedback, Task, TaskResponse, User
 
 class UserSerializer(serializers.ModelSerializer):
     completedTasks = serializers.IntegerField(source='completed_tasks', read_only=True)
@@ -75,3 +75,61 @@ class LoginSerializer(serializers.Serializer):
             raise serializers.ValidationError('Must include email and password.')
 
         return data
+class TaskSerializer(serializers.ModelSerializer):
+    ownerId = serializers.CharField(source='owner_id', read_only=True)
+    selectedResponseId = serializers.CharField(source='selected_response_id', read_only=True, allow_null=True)
+    createdAt = serializers.DateTimeField(source='created_at', read_only=True)
+    updatedAt = serializers.DateTimeField(source='updated_at', read_only=True)
+
+    class Meta:
+        model = Task
+        fields = [
+            'id', 'title', 'description', 'category', 'location', 'compensation',
+            'status', 'ownerId', 'selectedResponseId', 'createdAt', 'updatedAt'
+        ]
+        read_only_fields = ['id', 'status', 'ownerId', 'selectedResponseId', 'createdAt', 'updatedAt']
+
+    def validate_compensation(self, value):
+        if not isinstance(value, dict):
+            raise serializers.ValidationError('Compensation must be an object.')
+
+        if value.get('type') != 'money':
+            raise serializers.ValidationError('Compensation type must be "money".')
+        if value.get('currency') != 'UAH':
+            raise serializers.ValidationError('Compensation currency must be "UAH".')
+
+        amount = value.get('amount')
+        if amount is None or not isinstance(amount, (int, float)) or amount <= 0:
+            raise serializers.ValidationError('Compensation amount must be a positive number.')
+
+        return value
+
+
+class TaskResponseSerializer(serializers.ModelSerializer):
+    taskId = serializers.CharField(source='task_id', read_only=True)
+    providerId = serializers.CharField(source='provider_id', read_only=True)
+    createdAt = serializers.DateTimeField(source='created_at', read_only=True)
+
+    class Meta:
+        model = TaskResponse
+        fields = [
+            'id', 'taskId', 'providerId', 'comment', 'status', 'createdAt'
+        ]
+        read_only_fields = ['id', 'taskId', 'providerId', 'createdAt']
+
+
+class CompletionRequestSerializer(serializers.ModelSerializer):
+    taskId = serializers.CharField(source='task_id', read_only=True)
+    requestedByUserId = serializers.CharField(source='requested_by_id', read_only=True)
+    confirmedByUserId = serializers.CharField(source='confirmed_by_id', read_only=True, allow_null=True)
+    createdAt = serializers.DateTimeField(source='created_at', read_only=True)
+    updatedAt = serializers.DateTimeField(source='updated_at', read_only=True)
+    concernReason = serializers.CharField(source='concern_reason', allow_blank=True, required=False)
+
+    class Meta:
+        model = CompletionRequest
+        fields = [
+            'id', 'taskId', 'requestedByUserId', 'confirmedByUserId', 'status',
+            'note', 'concernReason', 'createdAt', 'updatedAt'
+        ]
+        read_only_fields = ['id', 'taskId', 'requestedByUserId', 'confirmedByUserId', 'status', 'createdAt', 'updatedAt']
