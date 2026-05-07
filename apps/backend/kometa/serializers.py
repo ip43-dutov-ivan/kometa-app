@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 from django.contrib.auth import authenticate
-from .models import User
+from .models import Feedback, User
 
 class UserSerializer(serializers.ModelSerializer):
     completedTasks = serializers.IntegerField(source='completed_tasks', read_only=True)
@@ -15,6 +15,18 @@ class UserSerializer(serializers.ModelSerializer):
             'rating', 'completedTasks', 'accountStatus', 'avatarUrl'
         ]
         read_only_fields = ['id', 'rating', 'completedTasks', 'accountStatus']
+
+class FeedbackSerializer(serializers.ModelSerializer):
+    authorId = serializers.CharField(source='author_id', read_only=True)
+    receiverId = serializers.CharField(source='receiver_id', read_only=True)
+    taskId = serializers.CharField(source='task_id', read_only=True)
+    createdAt = serializers.DateTimeField(source='created_at', read_only=True)
+
+    class Meta:
+        model = Feedback
+        fields = [
+            'id', 'taskId', 'authorId', 'receiverId', 'rating', 'comment', 'createdAt'
+        ]
 
 class RegisterSerializer(serializers.ModelSerializer):
     email = serializers.EmailField(

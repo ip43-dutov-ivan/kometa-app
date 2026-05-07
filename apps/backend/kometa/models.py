@@ -1,3 +1,5 @@
+import uuid
+
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 
@@ -18,3 +20,27 @@ class User(AbstractUser):
 
     def __str__(self):
         return self.name
+
+
+class Feedback(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    task_id = models.CharField(max_length=255)
+    author = models.ForeignKey(
+        User,
+        related_name='feedback_given',
+        on_delete=models.CASCADE,
+    )
+    receiver = models.ForeignKey(
+        User,
+        related_name='feedback_received',
+        on_delete=models.CASCADE,
+    )
+    rating = models.IntegerField()
+    comment = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'Feedback from {self.author_id} to {self.receiver_id}'
