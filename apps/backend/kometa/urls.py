@@ -3,7 +3,12 @@ from rest_framework.routers import DefaultRouter
 from .views.auth import register, login, logout
 from .views.users import UserViewSet
 from .views.conversations import ConversationViewSet, ConversationMessageViewSet
-from .views.tasks import MatchViewSet, TaskViewSet, TaskResponseViewSet, CompletionRequestViewSet, MyResponsesView, ReportViewSet
+from .views.completion_requests import CompletionRequestViewSet
+from .views.matches import MatchViewSet
+from .views.my_responses import MyResponsesView
+from .views.reports import ReportViewSet
+from .views.task_responses import TaskResponseViewSet
+from .views.tasks import TaskViewSet
 
 app_name = 'kometa'
 
