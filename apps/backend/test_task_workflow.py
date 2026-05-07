@@ -158,6 +158,48 @@ response = client.get(
 print(f"Status: {response.status_code}")
 print(f"Response: {response.json()}\n")
 
+match_items = response.json().get('items', [])
+if match_items:
+    conversation_id = match_items[0]['conversationId']
+
+    # Owner lists conversations
+    print("=== Owner Lists Conversations ===")
+    response = client.get(
+        '/api/v1/conversations/?limit=20&offset=0',
+        HTTP_AUTHORIZATION=f'Bearer {owner_token}',
+    )
+    print(f"Status: {response.status_code}")
+    print(f"Response: {response.json()}\n")
+
+    # Owner gets conversation metadata
+    print("=== Owner Gets Conversation Metadata ===")
+    response = client.get(
+        f'/api/v1/conversations/{conversation_id}/',
+        HTTP_AUTHORIZATION=f'Bearer {owner_token}',
+    )
+    print(f"Status: {response.status_code}")
+    print(f"Response: {response.json()}\n")
+
+    # Owner sends a chat message
+    print("=== Owner Sends Chat Message ===")
+    response = client.post(
+        f'/api/v1/conversations/{conversation_id}/messages/',
+        {'body': 'Hello, I am ready to start.'},
+        HTTP_AUTHORIZATION=f'Bearer {owner_token}',
+        format='json'
+    )
+    print(f"Status: {response.status_code}")
+    print(f"Response: {response.json()}\n")
+
+    # Owner lists chat messages
+    print("=== Owner Lists Chat Messages ===")
+    response = client.get(
+        f'/api/v1/conversations/{conversation_id}/messages/?limit=50',
+        HTTP_AUTHORIZATION=f'Bearer {owner_token}',
+    )
+    print(f"Status: {response.status_code}")
+    print(f"Response: {response.json()}\n")
+
 # Provider requests completion
 print("=== Provider Requests Completion ===")
 response = client.post(

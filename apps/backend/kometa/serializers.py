@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 from django.contrib.auth import authenticate
-from .models import CompletionRequest, Conversation, Feedback, Match, Task, TaskResponse, User
+from .models import CompletionRequest, Conversation, ConversationMessage, Feedback, Match, Task, TaskResponse, User
 
 class UserSerializer(serializers.ModelSerializer):
     completedTasks = serializers.IntegerField(source='completed_tasks', read_only=True)
@@ -137,6 +137,29 @@ class CompletionRequestSerializer(serializers.ModelSerializer):
             'note', 'concernReason', 'createdAt', 'updatedAt'
         ]
         read_only_fields = ['id', 'taskId', 'requestedByUserId', 'confirmedByUserId', 'status', 'createdAt', 'updatedAt']
+
+
+class ConversationSerializer(serializers.ModelSerializer):
+    taskId = serializers.CharField(source='task_id', read_only=True)
+    participantIds = serializers.ListField(source='participant_ids', child=serializers.IntegerField(), read_only=True)
+    lastMessageAt = serializers.DateTimeField(source='last_message_at', read_only=True)
+    createdAt = serializers.DateTimeField(source='created_at', read_only=True)
+
+    class Meta:
+        model = Conversation
+        fields = ['id', 'taskId', 'participantIds', 'lastMessageAt', 'createdAt']
+        read_only_fields = ['id', 'taskId', 'participantIds', 'lastMessageAt', 'createdAt']
+
+
+class ConversationMessageSerializer(serializers.ModelSerializer):
+    conversationId = serializers.CharField(source='conversation_id', read_only=True)
+    senderId = serializers.CharField(source='sender_id', read_only=True)
+    createdAt = serializers.DateTimeField(source='created_at', read_only=True)
+
+    class Meta:
+        model = ConversationMessage
+        fields = ['id', 'conversationId', 'senderId', 'body', 'createdAt']
+        read_only_fields = ['id', 'conversationId', 'senderId', 'createdAt']
 
 
 class MatchSerializer(serializers.ModelSerializer):
