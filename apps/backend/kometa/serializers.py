@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 from django.contrib.auth import authenticate
-from .models import CompletionRequest, Feedback, Task, TaskResponse, User
+from .models import CompletionRequest, Conversation, Feedback, Match, Task, TaskResponse, User
 
 class UserSerializer(serializers.ModelSerializer):
     completedTasks = serializers.IntegerField(source='completed_tasks', read_only=True)
@@ -108,14 +108,18 @@ class TaskSerializer(serializers.ModelSerializer):
 class TaskResponseSerializer(serializers.ModelSerializer):
     taskId = serializers.CharField(source='task_id', read_only=True)
     providerId = serializers.CharField(source='provider_id', read_only=True)
+    providerName = serializers.CharField(source='provider.name', read_only=True)
+    providerLocation = serializers.CharField(source='provider.location', read_only=True)
+    providerAvatarUrl = serializers.URLField(source='provider.avatar_url', read_only=True)
     createdAt = serializers.DateTimeField(source='created_at', read_only=True)
 
     class Meta:
         model = TaskResponse
         fields = [
-            'id', 'taskId', 'providerId', 'comment', 'status', 'createdAt'
+            'id', 'taskId', 'providerId', 'providerName', 'providerLocation', 'providerAvatarUrl',
+            'comment', 'status', 'createdAt'
         ]
-        read_only_fields = ['id', 'taskId', 'providerId', 'createdAt']
+        read_only_fields = ['id', 'taskId', 'providerId', 'providerName', 'providerLocation', 'providerAvatarUrl', 'createdAt']
 
 
 class CompletionRequestSerializer(serializers.ModelSerializer):
@@ -133,3 +137,19 @@ class CompletionRequestSerializer(serializers.ModelSerializer):
             'note', 'concernReason', 'createdAt', 'updatedAt'
         ]
         read_only_fields = ['id', 'taskId', 'requestedByUserId', 'confirmedByUserId', 'status', 'createdAt', 'updatedAt']
+
+
+class MatchSerializer(serializers.ModelSerializer):
+    taskId = serializers.CharField(source='task_id', read_only=True)
+    responseId = serializers.CharField(source='response_id', read_only=True)
+    ownerId = serializers.CharField(source='owner_id', read_only=True)
+    providerId = serializers.CharField(source='provider_id', read_only=True)
+    conversationId = serializers.CharField(source='conversation_id', read_only=True)
+    createdAt = serializers.DateTimeField(source='created_at', read_only=True)
+
+    class Meta:
+        model = Match
+        fields = [
+            'id', 'taskId', 'responseId', 'ownerId', 'providerId', 'conversationId', 'createdAt'
+        ]
+        read_only_fields = ['id', 'taskId', 'responseId', 'ownerId', 'providerId', 'conversationId', 'createdAt']

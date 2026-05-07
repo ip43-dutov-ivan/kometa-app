@@ -2,10 +2,11 @@ from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
+from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from django.db.models import Q
-from ..models import Task, TaskResponse, CompletionRequest
-from ..serializers import TaskSerializer, TaskResponseSerializer, CompletionRequestSerializer
+from ..models import Task, TaskResponse, CompletionRequest, Conversation, Match
+from ..serializers import TaskSerializer, TaskResponseSerializer, CompletionRequestSerializer, MatchSerializer
 
 
 class TaskViewSet(ModelViewSet):
@@ -220,6 +221,11 @@ class TaskResponseViewSet(ModelViewSet):
                 {'detail': 'Only task owner can accept responses.'},
                 status=status.HTTP_403_FORBIDDEN
             )
+        if task.status != 'open':
+            return Response(
+                {'detail': 'Can only accept responses for open tasks.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
         
         # Decline other pending responses
         task.responses.filter(status='pending').exclude(id=pk).update(status='declined')
@@ -227,7 +233,20 @@ class TaskResponseViewSet(ModelViewSet):
         # Accept this response
         response_obj.status = 'accepted'
         response_obj.save()
-        
+
+        # Create conversation and match
+        conversation = Conversation.objects.create(
+            task=task,
+            participant_ids=[task.owner_id, response_obj.provider_id]
+        )
+        Match.objects.create(
+            task=task,
+            response=response_obj,
+            owner=task.owner,
+            provider=response_obj.provider,
+            conversation=conversation
+        )
+
         # Update task to matched and set selected response
         task.status = 'matched'
         task.selected_response = response_obj
@@ -235,6 +254,84 @@ class TaskResponseViewSet(ModelViewSet):
         
         serializer = self.get_serializer(response_obj)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+class MyResponsesView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        responses_query = TaskResponse.objects.filter(provider=request.user)
+        status_param = request.query_params.get('status', None)
+        if status_param:
+            responses_query = responses_query.filter(status=status_param)
+
+        try:
+            limit = int(request.query_params.get('limit', 20))
+            offset = int(request.query_params.get('offset', 0))
+        except (TypeError, ValueError):
+            limit, offset = 20, 0
+
+        limit = max(1, min(limit, 100))
+        offset = max(0, offset)
+        total = responses_query.count()
+        items = responses_query[offset:offset + limit]
+
+        serializer = TaskResponseSerializer(items, many=True)
+        return Response({
+            'items': serializer.data,
+            'pageInfo': {
+                'limit': limit,
+                'offset': offset,
+                'total': total,
+                'hasMore': offset + limit < total,
+            },
+        })
+
+
+class MatchViewSet(ModelViewSet):
+    queryset = Match.objects.all()
+    serializer_class = MatchSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        queryset = Match.objects.filter(
+            Q(owner=self.request.user) | Q(provider=self.request.user)
+        )
+        active_only = self.request.query_params.get('activeOnly', None)
+        if active_only == 'true':
+            queryset = queryset.filter(
+                task__status__in=['matched', 'inProgress', 'completionRequested']
+            )
+        return queryset
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        total = queryset.count()
+
+        try:
+            limit = int(request.query_params.get('limit', 20))
+        except (TypeError, ValueError):
+            limit = 20
+        try:
+            offset = int(request.query_params.get('offset', 0))
+        except (TypeError, ValueError):
+            offset = 0
+
+        limit = max(1, min(limit, 100))
+        offset = max(0, offset)
+
+        items = queryset[offset:offset + limit]
+        serializer = self.get_serializer(items, many=True)
+
+        return Response({
+            'items': serializer.data,
+            'pageInfo': {
+                'limit': limit,
+                'offset': offset,
+                'total': total,
+                'hasMore': offset + limit < total,
+            },
+        })
 
 
 class CompletionRequestViewSet(ModelViewSet):

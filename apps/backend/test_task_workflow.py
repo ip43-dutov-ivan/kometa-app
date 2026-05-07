@@ -17,29 +17,38 @@ from kometa.models import User, Task, TaskResponse
 client = APIClient(HTTP_HOST='127.0.0.1')
 
 # Create test users
-task_owner = User.objects.create_user(
+task_owner, _ = User.objects.get_or_create(
     username='owner@example.com',
-    email='owner@example.com',
-    password='testpass123',
-    name='Task Owner',
-    location='Test City',
+    defaults={
+        'email': 'owner@example.com',
+        'name': 'Task Owner',
+        'location': 'Test City',
+    }
 )
+task_owner.set_password('testpass123')
+task_owner.save()
 
-provider1 = User.objects.create_user(
+provider1, _ = User.objects.get_or_create(
     username='provider1@example.com',
-    email='provider1@example.com',
-    password='testpass123',
-    name='Provider 1',
-    location='Provider City',
+    defaults={
+        'email': 'provider1@example.com',
+        'name': 'Provider 1',
+        'location': 'Provider City',
+    }
 )
+provider1.set_password('testpass123')
+provider1.save()
 
-provider2 = User.objects.create_user(
+provider2, _ = User.objects.get_or_create(
     username='provider2@example.com',
-    email='provider2@example.com',
-    password='testpass123',
-    name='Provider 2',
-    location='Provider City',
+    defaults={
+        'email': 'provider2@example.com',
+        'name': 'Provider 2',
+        'location': 'Provider City',
+    }
 )
+provider2.set_password('testpass123')
+provider2.save()
 
 # Generate JWT tokens
 owner_token = str(RefreshToken.for_user(task_owner).access_token)
@@ -75,6 +84,15 @@ response = client.post(
 print(f"Status: {response.status_code}")
 response1_id = response.json()['id']
 print(f"Response ID: {response1_id}")
+print(f"Response: {response.json()}\n")
+
+# Provider 1 lists own responses
+print("=== Provider 1 Lists My Responses ===")
+response = client.get(
+    '/api/v1/me/responses/?status=pending&limit=10',
+    HTTP_AUTHORIZATION=f'Bearer {provider1_token}',
+)
+print(f"Status: {response.status_code}")
 print(f"Response: {response.json()}\n")
 
 # Provider 2 submits a response
@@ -130,6 +148,15 @@ response = client.post(
 )
 print(f"Status: {response.status_code}")
 print(f"Task Status: {response.json()['status']}\n")
+
+# Owner lists matches
+print("=== Owner Lists Matches ===")
+response = client.get(
+    '/api/v1/matches/?activeOnly=true&limit=20&offset=0',
+    HTTP_AUTHORIZATION=f'Bearer {owner_token}',
+)
+print(f"Status: {response.status_code}")
+print(f"Response: {response.json()}\n")
 
 # Provider requests completion
 print("=== Provider Requests Completion ===")

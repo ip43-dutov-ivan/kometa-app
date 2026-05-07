@@ -131,3 +131,59 @@ class CompletionRequest(models.Model):
 
     def __str__(self):
         return f'Completion request for {self.task_id}'
+
+
+class Conversation(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    task = models.ForeignKey(
+        Task,
+        related_name='conversations',
+        on_delete=models.CASCADE,
+    )
+    participant_ids = models.JSONField(default=list)
+    last_message_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'Conversation for task {self.task_id}'
+
+
+class Match(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    task = models.ForeignKey(
+        Task,
+        related_name='matches',
+        on_delete=models.CASCADE,
+    )
+    response = models.ForeignKey(
+        TaskResponse,
+        related_name='selected_match',
+        on_delete=models.CASCADE,
+    )
+    owner = models.ForeignKey(
+        User,
+        related_name='matches_owner',
+        on_delete=models.CASCADE,
+    )
+    provider = models.ForeignKey(
+        User,
+        related_name='matches_provider',
+        on_delete=models.CASCADE,
+    )
+    conversation = models.ForeignKey(
+        Conversation,
+        null=True,
+        blank=True,
+        related_name='matches',
+        on_delete=models.SET_NULL,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'Match for task {self.task_id} between {self.owner_id} and {self.provider_id}'

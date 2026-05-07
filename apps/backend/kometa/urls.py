@@ -2,13 +2,14 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views.auth import register, login, logout
 from .views.users import UserViewSet
-from .views.tasks import TaskViewSet, TaskResponseViewSet, CompletionRequestViewSet
+from .views.tasks import MatchViewSet, TaskViewSet, TaskResponseViewSet, CompletionRequestViewSet, MyResponsesView
 
 app_name = 'kometa'
 
 router = DefaultRouter()
 router.register(r'users', UserViewSet, basename='users')
 router.register(r'tasks', TaskViewSet, basename='tasks')
+router.register(r'matches', MatchViewSet, basename='matches')
 
 urlpatterns = [
     # Auth
@@ -38,4 +39,5 @@ urlpatterns = [
     path('tasks/<str:task_id>/completion-requests/<str:pk>/concerns/', CompletionRequestViewSet.as_view({
         'post': 'concerns'
     }), name='task-completion-concerns'),
+    path('me/responses/', MyResponsesView.as_view(), name='my-responses'),
 ]
