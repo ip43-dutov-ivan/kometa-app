@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime
 
 from django.utils import timezone
@@ -8,6 +9,8 @@ from rest_framework.viewsets import ModelViewSet
 
 from ..models import Conversation, ConversationMessage
 from ..serializers import ConversationSerializer, ConversationMessageSerializer
+
+logger = logging.getLogger(__name__)
 
 
 class ConversationViewSet(ModelViewSet):
@@ -118,6 +121,13 @@ class ConversationMessageViewSet(ModelViewSet):
         )
         conversation.last_message_at = timezone.now()
         conversation.save(update_fields=['last_message_at'])
+
+        logger.info(
+            'Conversation message created conversation_id=%s message_id=%s sender_id=%s',
+            conversation.id,
+            message.id,
+            request.user.id,
+        )
 
         serializer = self.get_serializer(message)
         return Response(serializer.data, status=status.HTTP_201_CREATED)

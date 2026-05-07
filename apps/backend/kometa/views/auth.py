@@ -1,3 +1,5 @@
+import logging
+
 from django.db import IntegrityError
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
@@ -5,6 +7,9 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 from ..serializers import RegisterSerializer, LoginSerializer, UserSerializer
+
+logger = logging.getLogger(__name__)
+
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
@@ -14,15 +19,18 @@ def register(request):
         try:
             user = serializer.save()
         except IntegrityError:
+            logger.warning('User registration failed reason=duplicate_email')
             return Response(
                 {'email': ['A user with that email already exists.']},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         refresh = RefreshToken.for_user(user)
+        logger.info('User registered user_id=%s', user.id)
         return Response({
             'accessToken': str(refresh.access_token),
             'user': UserSerializer(user).data
         }, status=status.HTTP_201_CREATED)
+    logger.warning('User registration failed reason=validation_error')
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['POST'])
@@ -32,13 +40,16 @@ def login(request):
     if serializer.is_valid():
         user = serializer.validated_data['user']
         refresh = RefreshToken.for_user(user)
+        logger.info('User login succeeded user_id=%s', user.id)
         return Response({
             'accessToken': str(refresh.access_token),
             'user': UserSerializer(user).data
         })
+    logger.warning('User login failed reason=validation_error')
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['POST'])
 def logout(request):
     # For JWT, logout is handled client-side by removing the token
+    logger.info('User logout user_id=%s', request.user.id)
     return Response(status=status.HTTP_204_NO_CONTENT)

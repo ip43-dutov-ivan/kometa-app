@@ -1,3 +1,6 @@
+import logging
+
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -5,6 +8,9 @@ from rest_framework.viewsets import ModelViewSet
 from rest_framework.permissions import IsAuthenticated
 from ..models import Feedback, User
 from ..serializers import FeedbackSerializer, UserSerializer
+
+logger = logging.getLogger(__name__)
+
 
 class UserViewSet(ModelViewSet):
     queryset = User.objects.all()
@@ -20,6 +26,7 @@ class UserViewSet(ModelViewSet):
         serializer = UserSerializer(request.user, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
+            logger.info('User profile updated user_id=%s', request.user.id)
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -60,6 +67,11 @@ class UserViewSet(ModelViewSet):
     @action(detail=True, methods=['post'], url_path='block')
     def block(self, request, pk=None):
         if not request.user.is_staff:
+            logger.warning(
+                'Admin action denied action=block actor_id=%s target_user_id=%s',
+                request.user.id,
+                pk,
+            )
             return Response(
                 {'detail': 'Admin access required.'},
                 status=status.HTTP_403_FORBIDDEN
@@ -68,15 +80,24 @@ class UserViewSet(ModelViewSet):
         reason = request.data.get('reason', '')
         user.account_status = 'blocked'
         user.blocked_reason = reason
-        from django.utils import timezone
         user.blocked_at = timezone.now()
         user.save()
+        logger.info(
+            'User blocked actor_id=%s target_user_id=%s',
+            request.user.id,
+            user.id,
+        )
         serializer = UserSerializer(user)
         return Response(serializer.data)
 
     @action(detail=True, methods=['post'], url_path='unblock')
     def unblock(self, request, pk=None):
         if not request.user.is_staff:
+            logger.warning(
+                'Admin action denied action=unblock actor_id=%s target_user_id=%s',
+                request.user.id,
+                pk,
+            )
             return Response(
                 {'detail': 'Admin access required.'},
                 status=status.HTTP_403_FORBIDDEN
@@ -86,5 +107,10 @@ class UserViewSet(ModelViewSet):
         user.blocked_reason = ''
         user.blocked_at = None
         user.save()
+        logger.info(
+            'User unblocked actor_id=%s target_user_id=%s',
+            request.user.id,
+            user.id,
+        )
         serializer = UserSerializer(user)
         return Response(serializer.data)

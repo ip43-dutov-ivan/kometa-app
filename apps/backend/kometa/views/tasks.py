@@ -1,3 +1,5 @@
+import logging
+
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -8,6 +10,8 @@ from django.db.models import Q
 from ..models import Task, TaskResponse, CompletionRequest, Conversation, Feedback, Match, Report
 from ..serializers import TaskSerializer, TaskResponseSerializer, CompletionRequestSerializer, FeedbackSerializer, MatchSerializer, ReportSerializer
 
+logger = logging.getLogger(__name__)
+
 
 class TaskViewSet(ModelViewSet):
     queryset = Task.objects.all()
@@ -15,7 +19,13 @@ class TaskViewSet(ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def perform_create(self, serializer):
-        serializer.save(owner=self.request.user)
+        task = serializer.save(owner=self.request.user)
+        logger.info(
+            'Task created task_id=%s owner_id=%s status=%s',
+            task.id,
+            self.request.user.id,
+            task.status,
+        )
 
     def get_queryset(self):
         queryset = Task.objects.all()
@@ -75,11 +85,23 @@ class TaskViewSet(ModelViewSet):
     def update(self, request, *args, **kwargs):
         task = self.get_object()
         if task.owner != request.user:
+            logger.warning(
+                'Task update denied task_id=%s actor_id=%s owner_id=%s reason=not_owner',
+                task.id,
+                request.user.id,
+                task.owner_id,
+            )
             return Response(
                 {'detail': 'Only the task owner can update this task.'},
                 status=status.HTTP_403_FORBIDDEN
             )
         if task.status != 'open':
+            logger.warning(
+                'Task update denied task_id=%s actor_id=%s status=%s reason=invalid_status',
+                task.id,
+                request.user.id,
+                task.status,
+            )
             return Response(
                 {'detail': 'Can only update tasks in open status.'},
                 status=status.HTTP_400_BAD_REQUEST
@@ -89,6 +111,12 @@ class TaskViewSet(ModelViewSet):
         serializer = self.get_serializer(task, data=request.data, partial=partial)
         if serializer.is_valid():
             serializer.save()
+            logger.info(
+                'Task updated task_id=%s owner_id=%s status=%s',
+                task.id,
+                request.user.id,
+                task.status,
+            )
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -96,18 +124,39 @@ class TaskViewSet(ModelViewSet):
     def start(self, request, pk=None):
         task = self.get_object()
         if task.status != 'matched':
+            logger.warning(
+                'Task start denied task_id=%s actor_id=%s status=%s reason=invalid_status',
+                task.id,
+                request.user.id,
+                task.status,
+            )
             return Response(
                 {'detail': 'Can only start tasks in matched status.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
         if task.owner != request.user and task.selected_response.provider != request.user:
+            logger.warning(
+                'Task start denied task_id=%s actor_id=%s owner_id=%s provider_id=%s reason=not_participant',
+                task.id,
+                request.user.id,
+                task.owner_id,
+                task.selected_response.provider_id,
+            )
             return Response(
                 {'detail': 'Only the task owner or provider can start this task.'},
                 status=status.HTTP_403_FORBIDDEN
             )
 
+        old_status = task.status
         task.status = 'inProgress'
         task.save()
+        logger.info(
+            'Task started task_id=%s actor_id=%s old_status=%s new_status=%s',
+            task.id,
+            request.user.id,
+            old_status,
+            task.status,
+        )
         serializer = self.get_serializer(task)
         return Response(serializer.data)
 
@@ -171,6 +220,14 @@ class TaskViewSet(ModelViewSet):
                 rating=rating,
                 comment=comment,
             )
+            logger.info(
+                'Feedback created feedback_id=%s task_id=%s author_id=%s receiver_id=%s rating=%s',
+                feedback.id,
+                task.id,
+                request.user.id,
+                receiver.id,
+                rating,
+            )
             serializer = FeedbackSerializer(feedback)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
 
@@ -223,6 +280,12 @@ class TaskResponseViewSet(ModelViewSet):
             )
         
         if task.owner != request.user:
+            logger.warning(
+                'Task responses list denied task_id=%s actor_id=%s owner_id=%s reason=not_owner',
+                task.id,
+                request.user.id,
+                task.owner_id,
+            )
             return Response(
                 {'detail': 'Only task owner can view responses.'},
                 status=status.HTTP_403_FORBIDDEN
@@ -266,11 +329,22 @@ class TaskResponseViewSet(ModelViewSet):
             )
         
         if task.owner == request.user:
+            logger.warning(
+                'Task response denied task_id=%s actor_id=%s reason=owner_cannot_respond',
+                task.id,
+                request.user.id,
+            )
             return Response(
                 {'detail': 'Task owner cannot submit a response.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
         if task.status != 'open':
+            logger.warning(
+                'Task response denied task_id=%s actor_id=%s status=%s reason=invalid_status',
+                task.id,
+                request.user.id,
+                task.status,
+            )
             return Response(
                 {'detail': 'Can only respond to open tasks.'},
                 status=status.HTTP_400_BAD_REQUEST
@@ -279,6 +353,12 @@ class TaskResponseViewSet(ModelViewSet):
         # Check if user already responded
         existing_response = TaskResponse.objects.filter(task=task, provider=request.user).first()
         if existing_response:
+            logger.warning(
+                'Task response denied task_id=%s actor_id=%s existing_response_id=%s reason=duplicate_response',
+                task.id,
+                request.user.id,
+                existing_response.id,
+            )
             return Response(
                 {'detail': 'You have already submitted a response for this task.'},
                 status=status.HTTP_400_BAD_REQUEST
@@ -290,6 +370,13 @@ class TaskResponseViewSet(ModelViewSet):
             provider=request.user,
             comment=comment,
             status='pending'
+        )
+        logger.info(
+            'Task response created task_id=%s response_id=%s provider_id=%s status=%s',
+            task.id,
+            response_obj.id,
+            request.user.id,
+            response_obj.status,
         )
         serializer = self.get_serializer(response_obj)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -307,11 +394,25 @@ class TaskResponseViewSet(ModelViewSet):
             )
         
         if task.owner != request.user:
+            logger.warning(
+                'Task response accept denied task_id=%s response_id=%s actor_id=%s owner_id=%s reason=not_owner',
+                task.id,
+                response_obj.id,
+                request.user.id,
+                task.owner_id,
+            )
             return Response(
                 {'detail': 'Only task owner can accept responses.'},
                 status=status.HTTP_403_FORBIDDEN
             )
         if task.status != 'open':
+            logger.warning(
+                'Task response accept denied task_id=%s response_id=%s actor_id=%s status=%s reason=invalid_status',
+                task.id,
+                response_obj.id,
+                request.user.id,
+                task.status,
+            )
             return Response(
                 {'detail': 'Can only accept responses for open tasks.'},
                 status=status.HTTP_400_BAD_REQUEST
@@ -329,7 +430,7 @@ class TaskResponseViewSet(ModelViewSet):
             task=task,
             participant_ids=[task.owner_id, response_obj.provider_id]
         )
-        Match.objects.create(
+        match = Match.objects.create(
             task=task,
             response=response_obj,
             owner=task.owner,
@@ -341,6 +442,16 @@ class TaskResponseViewSet(ModelViewSet):
         task.status = 'matched'
         task.selected_response = response_obj
         task.save()
+        logger.info(
+            'Task response accepted task_id=%s response_id=%s match_id=%s conversation_id=%s owner_id=%s provider_id=%s old_status=open new_status=%s',
+            task.id,
+            response_obj.id,
+            match.id,
+            conversation.id,
+            task.owner_id,
+            response_obj.provider_id,
+            task.status,
+        )
         
         serializer = self.get_serializer(response_obj)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -460,6 +571,13 @@ class CompletionRequestViewSet(ModelViewSet):
         is_provider = task.selected_response.provider == request.user
         
         if not (is_owner or is_provider):
+            logger.warning(
+                'Completion request denied task_id=%s actor_id=%s owner_id=%s provider_id=%s reason=not_participant',
+                task.id,
+                request.user.id,
+                task.owner_id,
+                task.selected_response.provider_id,
+            )
             return Response(
                 {'detail': 'Only matched participants can request completion.'},
                 status=status.HTTP_403_FORBIDDEN
@@ -474,8 +592,17 @@ class CompletionRequestViewSet(ModelViewSet):
         )
         
         # Update task status to completionRequested
+        old_status = task.status
         task.status = 'completionRequested'
         task.save()
+        logger.info(
+            'Completion requested task_id=%s completion_request_id=%s actor_id=%s old_status=%s new_status=%s',
+            task.id,
+            completion_request.id,
+            request.user.id,
+            old_status,
+            task.status,
+        )
         
         serializer = self.get_serializer(completion_request)
         task_serializer = TaskSerializer(task)
@@ -515,6 +642,13 @@ class CompletionRequestViewSet(ModelViewSet):
         is_requester = completion_request.requested_by == request.user
         
         if not ((is_owner or is_provider) and not is_requester):
+            logger.warning(
+                'Completion confirm denied task_id=%s completion_request_id=%s actor_id=%s requester_id=%s reason=not_other_participant',
+                task.id,
+                completion_request.id,
+                request.user.id,
+                completion_request.requested_by_id,
+            )
             return Response(
                 {'detail': 'Only the other matched participant can confirm completion.'},
                 status=status.HTTP_403_FORBIDDEN
@@ -526,8 +660,18 @@ class CompletionRequestViewSet(ModelViewSet):
         completion_request.save()
         
         # Update task to completed
+        old_status = task.status
         task.status = 'completed'
         task.save()
+        logger.info(
+            'Completion confirmed task_id=%s completion_request_id=%s actor_id=%s requester_id=%s old_status=%s new_status=%s',
+            task.id,
+            completion_request.id,
+            request.user.id,
+            completion_request.requested_by_id,
+            old_status,
+            task.status,
+        )
         
         serializer = self.get_serializer(completion_request)
         task_serializer = TaskSerializer(task)
@@ -567,6 +711,13 @@ class CompletionRequestViewSet(ModelViewSet):
         is_requester = completion_request.requested_by == request.user
         
         if not ((is_owner or is_provider) and not is_requester):
+            logger.warning(
+                'Completion concern denied task_id=%s completion_request_id=%s actor_id=%s requester_id=%s reason=not_other_participant',
+                task.id,
+                completion_request.id,
+                request.user.id,
+                completion_request.requested_by_id,
+            )
             return Response(
                 {'detail': 'Only the other matched participant can raise a concern.'},
                 status=status.HTTP_403_FORBIDDEN
@@ -578,8 +729,18 @@ class CompletionRequestViewSet(ModelViewSet):
         completion_request.save()
         
         # Task goes back to inProgress
+        old_status = task.status
         task.status = 'inProgress'
         task.save()
+        logger.info(
+            'Completion concern raised task_id=%s completion_request_id=%s actor_id=%s requester_id=%s old_status=%s new_status=%s',
+            task.id,
+            completion_request.id,
+            request.user.id,
+            completion_request.requested_by_id,
+            old_status,
+            task.status,
+        )
         
         serializer = self.get_serializer(completion_request)
         task_serializer = TaskSerializer(task)
@@ -608,6 +769,10 @@ class ReportViewSet(ModelViewSet):
 
     def list(self, request, *args, **kwargs):
         if not request.user.is_staff:
+            logger.warning(
+                'Admin action denied action=list_reports actor_id=%s',
+                request.user.id,
+            )
             return Response(
                 {'detail': 'Admin access required.'},
                 status=status.HTTP_403_FORBIDDEN
@@ -644,13 +809,39 @@ class ReportViewSet(ModelViewSet):
         serializer = self.get_serializer(data=request.data)
         if serializer.is_valid():
             report = serializer.save()
+            logger.info(
+                'Report created report_id=%s reporter_id=%s reported_user_id=%s task_id=%s status=%s',
+                report.id,
+                report.reporter_id,
+                report.reported_user_id,
+                report.task_id,
+                report.status,
+            )
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def update(self, request, *args, **kwargs):
         if not request.user.is_staff:
+            logger.warning(
+                'Admin action denied action=update_report actor_id=%s report_id=%s',
+                request.user.id,
+                kwargs.get('pk'),
+            )
             return Response(
                 {'detail': 'Admin access required.'},
                 status=status.HTTP_403_FORBIDDEN
             )
-        return super().update(request, *args, **kwargs)
+        partial = kwargs.pop('partial', False)
+        report = self.get_object()
+        old_status = report.status
+        serializer = self.get_serializer(report, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        logger.info(
+            'Report updated report_id=%s actor_id=%s old_status=%s new_status=%s',
+            report.id,
+            request.user.id,
+            old_status,
+            serializer.instance.status,
+        )
+        return Response(serializer.data)
