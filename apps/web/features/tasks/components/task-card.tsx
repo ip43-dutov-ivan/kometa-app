@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Task } from "@kometa/logic";
+import { getTaskCategoryLabel } from "@kometa/logic";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,7 +10,7 @@ export function TaskCard({ task }: { task: Task }) {
     <Card className="rounded-lg">
       <CardHeader>
         <div className="flex flex-wrap items-center gap-2">
-          <Badge variant="secondary">{task.category}</Badge>
+          <Badge variant="secondary">{getTaskCategoryLabel(task.category)}</Badge>
           <Badge variant="outline">{task.status}</Badge>
         </div>
         <CardTitle className="text-xl leading-tight">{task.title}</CardTitle>

@@ -168,3 +168,25 @@ class TaskWorkflowTests(APITestCase):
         )
         self.assertEqual(block_response.status_code, status.HTTP_200_OK)
         self.assertEqual(block_response.json()['accountStatus'], 'blocked')
+
+    def test_task_category_filter_accepts_static_ids_and_legacy_labels(self):
+        self.owner_client.post(
+            '/api/v1/tasks/',
+            task_payload(category='home_tech'),
+            format='json',
+        )
+        self.owner_client.post(
+            '/api/v1/tasks/',
+            task_payload(category='Home tech'),
+            format='json',
+        )
+        self.owner_client.post(
+            '/api/v1/tasks/',
+            task_payload(category='education'),
+            format='json',
+        )
+
+        response = self.owner_client.get('/api/v1/tasks/?category=home_tech&limit=10')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json()['pageInfo']['total'], 2)

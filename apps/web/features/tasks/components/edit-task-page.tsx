@@ -4,7 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Save } from "lucide-react";
 import type { Task } from "@kometa/logic";
-import { toCreateTaskRequest } from "@kometa/logic";
+import { normalizeTaskCategoryId, toCreateTaskRequest } from "@kometa/logic";
 import { kometaApi } from "@/shared/api/client";
 import { ErrorState, LoadingState } from "@/shared/components/page-state";
 import { Button } from "@/components/ui/button";
@@ -12,10 +12,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { TaskCategorySelect } from "./task-category-select";
 
 export function EditTaskPage({ taskId }: { taskId: string }) {
   const router = useRouter();
   const [task, setTask] = useState<Task | null>(null);
+  const [category, setCategory] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -27,6 +29,7 @@ export function EditTaskPage({ taskId }: { taskId: string }) {
         const nextTask = await kometaApi.tasks.get(taskId);
         if (isActive) {
           setTask(nextTask);
+          setCategory(normalizeTaskCategoryId(nextTask.category));
         }
       } catch (caughtError) {
         if (isActive) {
@@ -47,6 +50,12 @@ export function EditTaskPage({ taskId }: { taskId: string }) {
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
+
+    if (!category) {
+      setError("Select a category before saving the task.");
+      return;
+    }
+
     setIsSubmitting(true);
 
     const formData = new FormData(event.currentTarget);
@@ -108,8 +117,13 @@ export function EditTaskPage({ taskId }: { taskId: string }) {
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="grid gap-2">
-                <Label htmlFor="category">Category</Label>
-                <Input id="category" name="category" defaultValue={task.category} required />
+                <Label>Category</Label>
+                <TaskCategorySelect
+                  name="category"
+                  value={category}
+                  onValueChange={setCategory}
+                  disabled={isSubmitting}
+                />
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="location">Location</Label>

@@ -2,7 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { Plus, Search } from "lucide-react";
+import { Plus, Search, X } from "lucide-react";
 import type { Task } from "@kometa/logic";
 import { buildAvailableTasksQuery, buildOwnTasksQuery } from "@kometa/logic";
 import { kometaApi } from "@/shared/api/client";
@@ -10,6 +10,7 @@ import { EmptyState, ErrorState, LoadingState } from "@/shared/components/page-s
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { TaskCategorySelect } from "./task-category-select";
 import { TaskCard } from "./task-card";
 
 export function TaskDiscoveryPage() {
@@ -62,12 +63,26 @@ export function TaskDiscoveryPage() {
         onSubmit={onSubmit}
       >
         <div className="grid gap-2">
-          <Label htmlFor="category">Category</Label>
-          <Input
-            id="category"
-            value={category}
-            onChange={(event) => setCategory(event.target.value)}
-          />
+          <Label>Category</Label>
+          <div className="flex gap-2">
+            <TaskCategorySelect
+              value={category}
+              onValueChange={setCategory}
+              placeholder="All categories"
+              searchPlaceholder="Search categories..."
+            />
+            {category ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                aria-label="Clear category"
+                onClick={() => setCategory("")}
+              >
+                <X />
+              </Button>
+            ) : null}
+          </div>
         </div>
         <div className="grid gap-2">
           <Label htmlFor="location">Location</Label>

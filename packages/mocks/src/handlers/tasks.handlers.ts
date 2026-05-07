@@ -22,7 +22,7 @@ export const taskHandlers = [
     const owner = url.searchParams.get("owner");
     const involved = url.searchParams.get("involved");
     const available = url.searchParams.get("available");
-    const category = url.searchParams.get("category")?.toLocaleLowerCase();
+    const category = normalizeTaskCategory(url.searchParams.get("category"));
     const location = url.searchParams.get("location")?.toLocaleLowerCase();
     const { limit, offset } = getPagination(url);
 
@@ -52,7 +52,7 @@ export const taskHandlers = [
         return false;
       }
 
-      if (category && !task.category.toLocaleLowerCase().includes(category)) {
+      if (category && normalizeTaskCategory(task.category) !== category) {
         return false;
       }
 
@@ -79,7 +79,7 @@ export const taskHandlers = [
       id: createId("task"),
       title: input.title?.trim() || "Untitled task",
       description: input.description?.trim() || "No description provided.",
-      category: input.category?.trim() || "General",
+      category: normalizeTaskCategory(input.category) || "other",
       location: input.location?.trim() || "Remote",
       compensation: input.compensation ?? { type: "money", amount: 0, currency: "UAH" },
       status: "open",
@@ -129,7 +129,9 @@ export const taskHandlers = [
     Object.assign(task, {
       title: input.title?.trim() || task.title,
       description: input.description?.trim() || task.description,
-      category: input.category?.trim() || task.category,
+      category: input.category
+        ? normalizeTaskCategory(input.category) || task.category
+        : task.category,
       location: input.location?.trim() || task.location,
       compensation: input.compensation ?? task.compensation,
       updatedAt: now(),
@@ -277,6 +279,23 @@ export const taskHandlers = [
     },
   ),
 ];
+
+function normalizeTaskCategory(value: string | null | undefined): string {
+  const normalizedValue = value?.trim();
+  if (!normalizedValue) {
+    return "";
+  }
+
+  const legacyCategories: Record<string, string> = {
+    "design review": "design",
+    education: "education",
+    errands: "errands",
+    general: "other",
+    "home tech": "home_tech",
+  };
+
+  return legacyCategories[normalizedValue.toLocaleLowerCase()] ?? normalizedValue;
+}
 
 function getPendingCompletionRequest(taskId: string, requestId: string, currentUser: UserId) {
   const task = tasks.find((item) => item.id === taskId);

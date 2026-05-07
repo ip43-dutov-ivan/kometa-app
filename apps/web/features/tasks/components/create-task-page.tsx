@@ -11,15 +11,23 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { TaskCategorySelect } from "./task-category-select";
 
 export function CreateTaskPage() {
   const router = useRouter();
+  const [category, setCategory] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
+
+    if (!category) {
+      setError("Select a category before creating the task.");
+      return;
+    }
+
     setIsSubmitting(true);
 
     const formData = new FormData(event.currentTarget);
@@ -67,8 +75,8 @@ export function CreateTaskPage() {
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="grid gap-2">
-                <Label htmlFor="category">Category</Label>
-                <Input id="category" name="category" required />
+                <Label>Category</Label>
+                <TaskCategorySelect name="category" value={category} onValueChange={setCategory} />
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="location">Location</Label>

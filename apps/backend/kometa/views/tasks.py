@@ -11,6 +11,14 @@ from ..serializers import FeedbackSerializer, TaskSerializer
 
 logger = logging.getLogger(__name__)
 
+LEGACY_TASK_CATEGORY_LABELS = {
+    'design': ['Design', 'Design review'],
+    'education': ['Education'],
+    'errands': ['Errands'],
+    'home_tech': ['Home tech'],
+    'other': ['General'],
+}
+
 
 class TaskViewSet(ModelViewSet):
     queryset = Task.objects.all()
@@ -38,7 +46,10 @@ class TaskViewSet(ModelViewSet):
         if status_param:
             queryset = queryset.filter(status=status_param)
         if category_param:
-            queryset = queryset.filter(category__icontains=category_param)
+            category_query = Q(category__iexact=category_param)
+            for legacy_label in LEGACY_TASK_CATEGORY_LABELS.get(category_param, []):
+                category_query |= Q(category__iexact=legacy_label)
+            queryset = queryset.filter(category_query)
         if location_param:
             queryset = queryset.filter(location__icontains=location_param)
         if owner_param == 'me':
