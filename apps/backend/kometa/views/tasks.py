@@ -5,8 +5,8 @@ from rest_framework.viewsets import ModelViewSet
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from django.db.models import Q
-from ..models import Task, TaskResponse, CompletionRequest, Conversation, Match
-from ..serializers import TaskSerializer, TaskResponseSerializer, CompletionRequestSerializer, MatchSerializer
+from ..models import Task, TaskResponse, CompletionRequest, Conversation, Feedback, Match
+from ..serializers import TaskSerializer, TaskResponseSerializer, CompletionRequestSerializer, FeedbackSerializer, MatchSerializer
 
 
 class TaskViewSet(ModelViewSet):
@@ -110,6 +110,96 @@ class TaskViewSet(ModelViewSet):
         task.save()
         serializer = self.get_serializer(task)
         return Response(serializer.data)
+
+    @action(detail=True, methods=['get', 'post'], url_path='feedback')
+    def feedback(self, request, pk=None):
+        task = self.get_object()
+        if task.status != 'completed':
+            return Response(
+                {'detail': 'Feedback is allowed only after task is completed.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if task.owner == request.user:
+            receiver = task.selected_response.provider if task.selected_response else None
+        elif task.selected_response and task.selected_response.provider == request.user:
+            receiver = task.owner
+        else:
+            return Response(
+                {'detail': 'Only matched participants can access feedback.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        if request.method == 'POST':
+            if receiver is None:
+                return Response(
+                    {'detail': 'Task has no matched provider.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            existing_feedback = Feedback.objects.filter(task_id=str(task.id), author=request.user).first()
+            if existing_feedback:
+                return Response(
+                    {'detail': 'Feedback already submitted for this task.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            rating = request.data.get('rating')
+            comment = request.data.get('comment', '')
+            if rating is None:
+                return Response(
+                    {'detail': 'Rating is required.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            try:
+                rating = int(rating)
+            except (TypeError, ValueError):
+                return Response(
+                    {'detail': 'Rating must be an integer.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            if rating < 1 or rating > 5:
+                return Response(
+                    {'detail': 'Rating must be between 1 and 5.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            feedback = Feedback.objects.create(
+                task_id=str(task.id),
+                author=request.user,
+                receiver=receiver,
+                rating=rating,
+                comment=comment,
+            )
+            serializer = FeedbackSerializer(feedback)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+        feedback_qs = Feedback.objects.filter(task_id=str(task.id))
+        total = feedback_qs.count()
+
+        try:
+            limit = int(request.query_params.get('limit', 20))
+        except (TypeError, ValueError):
+            limit = 20
+        try:
+            offset = int(request.query_params.get('offset', 0))
+        except (TypeError, ValueError):
+            offset = 0
+
+        limit = max(1, min(limit, 100))
+        offset = max(0, offset)
+
+        items = feedback_qs[offset:offset + limit]
+        serializer = FeedbackSerializer(items, many=True)
+        return Response({
+            'items': serializer.data,
+            'pageInfo': {
+                'limit': limit,
+                'offset': offset,
+                'total': total,
+                'hasMore': offset + limit < total,
+            },
+        })
 
 
 class TaskResponseViewSet(ModelViewSet):

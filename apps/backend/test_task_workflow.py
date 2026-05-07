@@ -226,6 +226,37 @@ if response.status_code == 201:
     print(f"Status: {response.status_code}")
     print(f"Completion Request: {response.json()['completionRequest']}")
     print(f"Task Status: {response.json()['task']['status']}\n")
+
+    # Owner leaves feedback for provider
+    print("=== Owner Leaves Feedback ===")
+    response = client.post(
+        f'/api/v1/tasks/{task_id}/feedback/',
+        {'rating': 5, 'comment': 'Great work!'},
+        HTTP_AUTHORIZATION=f'Bearer {owner_token}',
+        format='json'
+    )
+    print(f"Status: {response.status_code}")
+    print(f"Response: {response.json()}")
+
+    # Provider leaves feedback for owner
+    print("=== Provider Leaves Feedback ===")
+    response = client.post(
+        f'/api/v1/tasks/{task_id}/feedback/',
+        {'rating': 4, 'comment': 'Clear instructions.'},
+        HTTP_AUTHORIZATION=f'Bearer {provider1_token}',
+        format='json'
+    )
+    print(f"Status: {response.status_code}")
+    print(f"Response: {response.json()}")
+
+    # Get task feedback
+    print("=== Get Task Feedback ===")
+    response = client.get(
+        f'/api/v1/tasks/{task_id}/feedback/?limit=20&offset=0',
+        HTTP_AUTHORIZATION=f'Bearer {owner_token}',
+    )
+    print(f"Status: {response.status_code}")
+    print(f"Response: {response.json()}\n")
 else:
     print(f"Error: {response.json()}\n")
 
