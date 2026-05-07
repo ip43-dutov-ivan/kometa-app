@@ -80,6 +80,7 @@ class TaskSerializer(serializers.ModelSerializer):
     selectedResponseId = serializers.CharField(source='selected_response_id', read_only=True, allow_null=True)
     createdAt = serializers.DateTimeField(source='created_at', read_only=True)
     updatedAt = serializers.DateTimeField(source='updated_at', read_only=True)
+    location = serializers.DictField(write_only=True)
 
     class Meta:
         model = Task
@@ -88,6 +89,78 @@ class TaskSerializer(serializers.ModelSerializer):
             'status', 'ownerId', 'selectedResponseId', 'createdAt', 'updatedAt'
         ]
         read_only_fields = ['id', 'status', 'ownerId', 'selectedResponseId', 'createdAt', 'updatedAt']
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        location = {
+            'label': instance.location_label,
+            'isRemote': instance.location_is_remote,
+        }
+        if instance.location_latitude is not None:
+            location['latitude'] = instance.location_latitude
+        if instance.location_longitude is not None:
+            location['longitude'] = instance.location_longitude
+        data['location'] = location
+        return data
+
+    def validate_location(self, value):
+        if not isinstance(value, dict):
+            raise serializers.ValidationError('Location must be an object.')
+
+        label = str(value.get('label', '')).strip()
+        if not label:
+            raise serializers.ValidationError({'label': 'Location label is required.'})
+
+        is_remote = bool(value.get('isRemote', False))
+        if is_remote:
+            return {
+                'label': label,
+                'isRemote': True,
+                'latitude': None,
+                'longitude': None,
+            }
+
+        latitude = value.get('latitude')
+        longitude = value.get('longitude')
+        if latitude is None:
+            raise serializers.ValidationError({'latitude': 'Latitude is required for physical locations.'})
+        if longitude is None:
+            raise serializers.ValidationError({'longitude': 'Longitude is required for physical locations.'})
+
+        try:
+            latitude = float(latitude)
+            longitude = float(longitude)
+        except (TypeError, ValueError):
+            raise serializers.ValidationError('Latitude and longitude must be numbers.')
+
+        if latitude < -90 or latitude > 90:
+            raise serializers.ValidationError({'latitude': 'Latitude must be between -90 and 90.'})
+        if longitude < -180 or longitude > 180:
+            raise serializers.ValidationError({'longitude': 'Longitude must be between -180 and 180.'})
+
+        return {
+            'label': label,
+            'isRemote': False,
+            'latitude': latitude,
+            'longitude': longitude,
+        }
+
+    def create(self, validated_data):
+        location = validated_data.pop('location')
+        self.apply_location(validated_data, location)
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        location = validated_data.pop('location', None)
+        if location is not None:
+            self.apply_location(validated_data, location)
+        return super().update(instance, validated_data)
+
+    def apply_location(self, data, location):
+        data['location_label'] = location['label']
+        data['location_is_remote'] = location['isRemote']
+        data['location_latitude'] = location['latitude']
+        data['location_longitude'] = location['longitude']
 
     def validate_compensation(self, value):
         if not isinstance(value, dict):

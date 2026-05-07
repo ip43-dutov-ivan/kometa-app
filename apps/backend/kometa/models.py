@@ -62,7 +62,10 @@ class Task(models.Model):
     title = models.CharField(max_length=255)
     description = models.TextField()
     category = models.CharField(max_length=100)
-    location = models.CharField(max_length=255)
+    location_label = models.CharField(max_length=255)
+    location_latitude = models.FloatField(null=True, blank=True)
+    location_longitude = models.FloatField(null=True, blank=True)
+    location_is_remote = models.BooleanField(default=False)
     compensation = models.JSONField()  # { "type": "money", "amount": 350, "currency": "UAH" }
     status = models.CharField(max_length=20, choices=TASK_STATUS_CHOICES, default='open')
     owner = models.ForeignKey(User, related_name='tasks_owned', on_delete=models.CASCADE)

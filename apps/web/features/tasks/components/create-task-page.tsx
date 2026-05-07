@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
+import type { TaskLocation } from "@kometa/logic";
 import { toCreateTaskRequest } from "@kometa/logic";
 import { kometaApi } from "@/shared/api/client";
 import { ErrorState } from "@/shared/components/page-state";
@@ -12,10 +13,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { TaskCategorySelect } from "./task-category-select";
+import { TaskLocationPicker } from "./task-location-picker";
+
+const EMPTY_TASK_LOCATION: TaskLocation = {
+  label: "",
+  isRemote: false,
+};
 
 export function CreateTaskPage() {
   const router = useRouter();
   const [category, setCategory] = useState("");
+  const [location, setLocation] = useState<TaskLocation>(EMPTY_TASK_LOCATION);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -28,6 +36,11 @@ export function CreateTaskPage() {
       return;
     }
 
+    if (!isTaskLocationComplete(location)) {
+      setError("Select a map location or mark the task as remote.");
+      return;
+    }
+
     setIsSubmitting(true);
 
     const formData = new FormData(event.currentTarget);
@@ -35,7 +48,7 @@ export function CreateTaskPage() {
       title: String(formData.get("title") ?? ""),
       description: String(formData.get("description") ?? ""),
       category: String(formData.get("category") ?? ""),
-      location: String(formData.get("location") ?? ""),
+      location,
       amount: Number(formData.get("amount") ?? 0),
     });
 
@@ -79,13 +92,13 @@ export function CreateTaskPage() {
                 <TaskCategorySelect name="category" value={category} onValueChange={setCategory} />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="location">Location</Label>
-                <Input id="location" name="location" required />
+                <Label htmlFor="amount">Compensation, UAH</Label>
+                <Input id="amount" name="amount" type="number" min="0" step="1" required />
               </div>
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="amount">Compensation, UAH</Label>
-              <Input id="amount" name="amount" type="number" min="0" step="1" required />
+              <Label>Location</Label>
+              <TaskLocationPicker value={location} onChange={setLocation} disabled={isSubmitting} />
             </div>
             <Button type="submit" disabled={isSubmitting}>
               <Plus />
@@ -95,5 +108,19 @@ export function CreateTaskPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+function isTaskLocationComplete(location: TaskLocation): boolean {
+  if (!location.label.trim()) {
+    return false;
+  }
+
+  return (
+    location.isRemote ||
+    (location.latitude !== undefined &&
+      location.longitude !== undefined &&
+      Number.isFinite(location.latitude) &&
+      Number.isFinite(location.longitude))
   );
 }

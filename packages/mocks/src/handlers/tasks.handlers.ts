@@ -1,7 +1,7 @@
 import { http } from "msw";
 import { apiPath } from "../config";
 import { completionRequests, currentUserId, responses, tasks } from "../data";
-import type { CompletionRequest, Task, TaskStatus, UserId } from "../types";
+import type { CompletionRequest, Task, TaskLocation, TaskStatus, UserId } from "../types";
 import {
   createId,
   error,
@@ -56,7 +56,7 @@ export const taskHandlers = [
         return false;
       }
 
-      if (location && !task.location.toLocaleLowerCase().includes(location)) {
+      if (location && !task.location.label.toLocaleLowerCase().includes(location)) {
         return false;
       }
 
@@ -74,13 +74,18 @@ export const taskHandlers = [
 
     const body = await request.json().catch(() => ({}));
     const input = body as Partial<Task>;
+    const locationResult = normalizeTaskLocation(input.location);
+
+    if ("response" in locationResult) {
+      return locationResult.response;
+    }
 
     const task: Task = {
       id: createId("task"),
       title: input.title?.trim() || "Untitled task",
       description: input.description?.trim() || "No description provided.",
       category: normalizeTaskCategory(input.category) || "other",
-      location: input.location?.trim() || "Remote",
+      location: locationResult.location,
       compensation: input.compensation ?? { type: "money", amount: 0, currency: "UAH" },
       status: "open",
       ownerId: currentUserId,
@@ -125,6 +130,11 @@ export const taskHandlers = [
 
     const body = await request.json().catch(() => ({}));
     const input = body as Partial<Task>;
+    const locationResult = input.location ? normalizeTaskLocation(input.location) : null;
+
+    if (locationResult && "response" in locationResult) {
+      return locationResult.response;
+    }
 
     Object.assign(task, {
       title: input.title?.trim() || task.title,
@@ -132,7 +142,7 @@ export const taskHandlers = [
       category: input.category
         ? normalizeTaskCategory(input.category) || task.category
         : task.category,
-      location: input.location?.trim() || task.location,
+      location: locationResult?.location ?? task.location,
       compensation: input.compensation ?? task.compensation,
       updatedAt: now(),
     });
@@ -295,6 +305,54 @@ function normalizeTaskCategory(value: string | null | undefined): string {
   };
 
   return legacyCategories[normalizedValue.toLocaleLowerCase()] ?? normalizedValue;
+}
+
+function normalizeTaskLocation(value: TaskLocation | undefined) {
+  if (!value || typeof value !== "object") {
+    return { response: error("Location is required", "location_required", 422) };
+  }
+
+  const label = value.label?.trim();
+  if (!label) {
+    return { response: error("Location label is required", "location_label_required", 422) };
+  }
+
+  if (value.isRemote) {
+    return { location: { label, isRemote: true } satisfies TaskLocation };
+  }
+
+  const latitude = value.latitude;
+  const longitude = value.longitude;
+
+  if (
+    typeof latitude !== "number" ||
+    typeof longitude !== "number" ||
+    !Number.isFinite(latitude) ||
+    !Number.isFinite(longitude)
+  ) {
+    return {
+      response: error(
+        "Physical locations require latitude and longitude",
+        "location_coordinates_required",
+        422,
+      ),
+    };
+  }
+
+  if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
+    return {
+      response: error("Location coordinates are out of range", "location_out_of_range", 422),
+    };
+  }
+
+  return {
+    location: {
+      label,
+      isRemote: false,
+      latitude,
+      longitude,
+    } satisfies TaskLocation,
+  };
 }
 
 function getPendingCompletionRequest(taskId: string, requestId: string, currentUser: UserId) {

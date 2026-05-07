@@ -52,12 +52,19 @@ export interface AuthSession {
   user: UserProfile;
 }
 
+export interface TaskLocation {
+  label: string;
+  isRemote: boolean;
+  latitude?: number;
+  longitude?: number;
+}
+
 export interface Task {
   id: TaskId;
   title: string;
   description: string;
   category: string;
-  location: string;
+  location: TaskLocation;
   compensation: {
     type: "money";
     amount: number;

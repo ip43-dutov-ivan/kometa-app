@@ -53,12 +53,19 @@ export interface MoneyCompensation {
 
 export type Compensation = MoneyCompensation;
 
+export interface TaskLocation {
+  label: string;
+  isRemote: boolean;
+  latitude?: number;
+  longitude?: number;
+}
+
 export interface Task {
   id: TaskId;
   title: string;
   description: string;
   category: string;
-  location: string;
+  location: TaskLocation;
   compensation: Compensation;
   status: TaskStatus;
   ownerId: UserId;

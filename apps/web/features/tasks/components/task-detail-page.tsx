@@ -4,7 +4,7 @@ import { FormEvent, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Check, Edit, Flag, MessageSquare, Send, ShieldAlert } from "lucide-react";
 import type { Match, Task, User } from "@kometa/logic";
-import { getTaskCategoryLabel, isTaskOwner } from "@kometa/logic";
+import { getTaskCategoryLabel, getTaskLocationLabel, isTaskOwner } from "@kometa/logic";
 import { kometaApi } from "@/shared/api/client";
 import { EmptyState, ErrorState, LoadingState } from "@/shared/components/page-state";
 import { useKometaSession } from "@/shared/session/use-kometa-session";
@@ -184,7 +184,7 @@ export function TaskDetailPage({ taskId }: { taskId: string }) {
               <Badge variant="outline">{task.status}</Badge>
             </div>
             <h1 className="font-heading text-3xl font-semibold">{task.title}</h1>
-            <p className="mt-2 text-muted-foreground">{task.location}</p>
+            <p className="mt-2 text-muted-foreground">{getTaskLocationLabel(task.location)}</p>
           </div>
           <Card className="rounded-lg">
             <CardHeader>

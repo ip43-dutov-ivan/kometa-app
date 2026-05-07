@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ExternalLink } from "lucide-react";
 import type { Task, TaskResponse } from "@kometa/logic";
+import { getTaskLocationLabel } from "@kometa/logic";
 import { kometaApi } from "@/shared/api/client";
 import { EmptyState, ErrorState, LoadingState } from "@/shared/components/page-state";
 import { Badge } from "@/components/ui/badge";
@@ -78,7 +79,8 @@ export function MyResponsesPage() {
                 <p className="leading-6 text-muted-foreground">{response.comment}</p>
                 {task ? (
                   <p>
-                    {task.location} · {task.compensation.amount} {task.compensation.currency}
+                    {getTaskLocationLabel(task.location)} · {task.compensation.amount}{" "}
+                    {task.compensation.currency}
                   </p>
                 ) : null}
               </CardContent>

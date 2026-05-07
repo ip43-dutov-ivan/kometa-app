@@ -18,16 +18,16 @@ class UserEndpointTests(APITestCase):
         self.client = auth_client(self.user)
 
     def test_can_read_and_update_own_profile(self):
-        me_response = self.client.get('/api/v1/users/me/')
+        me_response = self.client.get('/api/v1/users/me')
         self.assertEqual(me_response.status_code, status.HTTP_200_OK)
         self.assertEqual(me_response.json()['name'], 'Test User')
 
-        detail_response = self.client.get(f'/api/v1/users/{self.user.id}/')
+        detail_response = self.client.get(f'/api/v1/users/{self.user.id}')
         self.assertEqual(detail_response.status_code, status.HTTP_200_OK)
         self.assertEqual(detail_response.json()['id'], self.user.id)
 
         update_response = self.client.patch(
-            '/api/v1/users/me/',
+            '/api/v1/users/me',
             {
                 'name': 'Updated Test User',
                 'location': 'Lviv',
@@ -52,7 +52,7 @@ class UserEndpointTests(APITestCase):
             comment='Self feedback',
         )
 
-        response = self.client.get(f'/api/v1/users/{self.user.id}/feedback/?limit=20&offset=0')
+        response = self.client.get(f'/api/v1/users/{self.user.id}/feedback?limit=20&offset=0')
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.json()['pageInfo']['total'], 1)

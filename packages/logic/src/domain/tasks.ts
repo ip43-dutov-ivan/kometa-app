@@ -1,5 +1,5 @@
 import Fuse from "fuse.js";
-import type { CreateTaskRequest, ListTasksQuery, Task } from "../api/dtos";
+import type { CreateTaskRequest, ListTasksQuery, Task, TaskLocation } from "../api/dtos";
 
 export type TaskCategoryLocale = "en" | "uk";
 
@@ -98,7 +98,7 @@ export interface TaskFormValues {
   title: string;
   description: string;
   category: string;
-  location: string;
+  location: TaskLocation;
   amount: number;
 }
 
@@ -120,13 +120,35 @@ export function toCreateTaskRequest(values: TaskFormValues): CreateTaskRequest {
     title: values.title.trim(),
     description: values.description.trim(),
     category: normalizeTaskCategoryId(values.category),
-    location: values.location.trim(),
+    location: normalizeTaskLocation(values.location),
     compensation: {
       type: "money",
       amount: Math.max(0, Number(values.amount) || 0),
       currency: "UAH",
     },
   };
+}
+
+export function normalizeTaskLocation(location: TaskLocation): TaskLocation {
+  const label = location.label.trim();
+
+  if (location.isRemote) {
+    return {
+      label: label || "Remote",
+      isRemote: true,
+    };
+  }
+
+  return {
+    label,
+    isRemote: false,
+    latitude: location.latitude,
+    longitude: location.longitude,
+  };
+}
+
+export function getTaskLocationLabel(location: TaskLocation): string {
+  return location.label.trim() || (location.isRemote ? "Remote" : "");
 }
 
 export function isTaskOwner(task: Task, currentUserId: string | null | undefined): boolean {

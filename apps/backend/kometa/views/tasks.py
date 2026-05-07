@@ -51,7 +51,7 @@ class TaskViewSet(ModelViewSet):
                 category_query |= Q(category__iexact=legacy_label)
             queryset = queryset.filter(category_query)
         if location_param:
-            queryset = queryset.filter(location__icontains=location_param)
+            queryset = queryset.filter(location_label__icontains=location_param)
         if owner_param == 'me':
             queryset = queryset.filter(owner=self.request.user)
         if involved_param == 'me':

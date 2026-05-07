@@ -3,6 +3,7 @@ import { Analytics } from "@vercel/analytics/next";
 import { Inter } from "next/font/google";
 import localFont from "next/font/local";
 import { MockServiceWorker } from "@/shared/mocks/mock-service-worker";
+import "mapbox-gl/dist/mapbox-gl.css";
 import "./globals.css";
 
 const inter = Inter({

@@ -3,7 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Save } from "lucide-react";
-import type { Task } from "@kometa/logic";
+import type { Task, TaskLocation } from "@kometa/logic";
 import { normalizeTaskCategoryId, toCreateTaskRequest } from "@kometa/logic";
 import { kometaApi } from "@/shared/api/client";
 import { ErrorState, LoadingState } from "@/shared/components/page-state";
@@ -13,11 +13,18 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { TaskCategorySelect } from "./task-category-select";
+import { TaskLocationPicker } from "./task-location-picker";
+
+const EMPTY_TASK_LOCATION: TaskLocation = {
+  label: "",
+  isRemote: false,
+};
 
 export function EditTaskPage({ taskId }: { taskId: string }) {
   const router = useRouter();
   const [task, setTask] = useState<Task | null>(null);
   const [category, setCategory] = useState("");
+  const [location, setLocation] = useState<TaskLocation>(EMPTY_TASK_LOCATION);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -30,6 +37,7 @@ export function EditTaskPage({ taskId }: { taskId: string }) {
         if (isActive) {
           setTask(nextTask);
           setCategory(normalizeTaskCategoryId(nextTask.category));
+          setLocation(nextTask.location);
         }
       } catch (caughtError) {
         if (isActive) {
@@ -56,6 +64,11 @@ export function EditTaskPage({ taskId }: { taskId: string }) {
       return;
     }
 
+    if (!isTaskLocationComplete(location)) {
+      setError("Select a map location or mark the task as remote.");
+      return;
+    }
+
     setIsSubmitting(true);
 
     const formData = new FormData(event.currentTarget);
@@ -63,7 +76,7 @@ export function EditTaskPage({ taskId }: { taskId: string }) {
       title: String(formData.get("title") ?? ""),
       description: String(formData.get("description") ?? ""),
       category: String(formData.get("category") ?? ""),
-      location: String(formData.get("location") ?? ""),
+      location,
       amount: Number(formData.get("amount") ?? 0),
     });
 
@@ -126,21 +139,21 @@ export function EditTaskPage({ taskId }: { taskId: string }) {
                 />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="location">Location</Label>
-                <Input id="location" name="location" defaultValue={task.location} required />
+                <Label htmlFor="amount">Compensation, UAH</Label>
+                <Input
+                  id="amount"
+                  name="amount"
+                  type="number"
+                  min="0"
+                  step="1"
+                  defaultValue={task.compensation.amount}
+                  required
+                />
               </div>
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="amount">Compensation, UAH</Label>
-              <Input
-                id="amount"
-                name="amount"
-                type="number"
-                min="0"
-                step="1"
-                defaultValue={task.compensation.amount}
-                required
-              />
+              <Label>Location</Label>
+              <TaskLocationPicker value={location} onChange={setLocation} disabled={isSubmitting} />
             </div>
             <Button type="submit" disabled={isSubmitting}>
               <Save />
@@ -150,5 +163,19 @@ export function EditTaskPage({ taskId }: { taskId: string }) {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+function isTaskLocationComplete(location: TaskLocation): boolean {
+  if (!location.label.trim()) {
+    return false;
+  }
+
+  return (
+    location.isRemote ||
+    (location.latitude !== undefined &&
+      location.longitude !== undefined &&
+      Number.isFinite(location.latitude) &&
+      Number.isFinite(location.longitude))
   );
 }
