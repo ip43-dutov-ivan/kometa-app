@@ -17,8 +17,8 @@ import { TaskCategorySelect } from "./task-category-select";
 import { TaskLocationPicker } from "./task-location-picker";
 
 const EMPTY_TASK_LOCATION: TaskLocation = {
-  label: "",
-  isRemote: false,
+  label: "Remote",
+  isRemote: true,
 };
 
 export function CreateTaskPage({ duplicateFrom }: { duplicateFrom?: string }) {

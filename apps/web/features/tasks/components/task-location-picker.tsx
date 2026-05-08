@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { ComponentProps } from "react";
 import { Geocoder } from "@mapbox/search-js-react";
 import mapboxgl from "mapbox-gl";
@@ -28,6 +28,7 @@ export function TaskLocationPicker({ value, onChange, disabled = false }: TaskLo
   const latestValueRef = useRef(value);
   const disabledRef = useRef(disabled);
   const onChangeRef = useRef(onChange);
+  const [hasLoadedMap, setHasLoadedMap] = useState(!value.isRemote);
 
   const setPhysicalLocation = useCallback((latitude: number, longitude: number, label: string) => {
     onChangeRef.current({
@@ -51,7 +52,13 @@ export function TaskLocationPicker({ value, onChange, disabled = false }: TaskLo
   }, [onChange]);
 
   useEffect(() => {
-    if (!MAPBOX_ACCESS_TOKEN || !mapContainerRef.current || mapRef.current) {
+    if (!value.isRemote) {
+      setHasLoadedMap(true);
+    }
+  }, [value.isRemote]);
+
+  useEffect(() => {
+    if (!hasLoadedMap || !MAPBOX_ACCESS_TOKEN || !mapContainerRef.current || mapRef.current) {
       return;
     }
 
@@ -83,7 +90,13 @@ export function TaskLocationPicker({ value, onChange, disabled = false }: TaskLo
       map.remove();
       mapRef.current = null;
     };
-  }, [setPhysicalLocation]);
+  }, [hasLoadedMap, setPhysicalLocation]);
+
+  useEffect(() => {
+    if (!value.isRemote) {
+      mapRef.current?.resize();
+    }
+  }, [value.isRemote]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -222,87 +235,94 @@ export function TaskLocationPicker({ value, onChange, disabled = false }: TaskLo
         />
       </div>
 
-      {value.isRemote ? (
-        <Input value={value.label} disabled />
-      ) : (
-        <div className="grid min-w-0 max-w-full gap-3">
-          {MAPBOX_ACCESS_TOKEN ? (
-            <div className="min-w-0 max-w-full [&_mapbox-geocoder]:block [&_mapbox-geocoder]:max-w-full">
-              <Geocoder
-                accessToken={MAPBOX_ACCESS_TOKEN}
-                value={value.label}
-                onChange={(label) => onChange({ ...value, label })}
-                onRetrieve={onRetrieve}
-                options={{
-                  country: "ua",
-                  language: "en",
-                  proximity: {
-                    lat: KYIV_CENTER.latitude,
-                    lng: KYIV_CENTER.longitude,
-                  },
-                }}
-                placeholder="Search for an address or place"
-                marker={false}
-                theme={geocoderTheme}
+      <div className="grid min-w-0 max-w-full gap-3">
+        {value.isRemote ? (
+          <Input value={value.label} disabled />
+        ) : MAPBOX_ACCESS_TOKEN ? (
+          <div className="min-w-0 max-w-full [&_mapbox-geocoder]:block [&_mapbox-geocoder]:max-w-full">
+            <Geocoder
+              accessToken={MAPBOX_ACCESS_TOKEN}
+              value={value.label}
+              onChange={(label) => onChange({ ...value, label })}
+              onRetrieve={onRetrieve}
+              options={{
+                country: "ua",
+                language: "en",
+                proximity: {
+                  lat: KYIV_CENTER.latitude,
+                  lng: KYIV_CENTER.longitude,
+                },
+              }}
+              placeholder="Search for an address or place"
+              marker={false}
+              theme={geocoderTheme}
+            />
+          </div>
+        ) : (
+          <Input
+            value={value.label}
+            onChange={(event) => onChange({ ...value, label: event.target.value })}
+            placeholder="Location label"
+            disabled={disabled}
+          />
+        )}
+
+        {hasLoadedMap ? (
+          <div
+            className={`min-w-0 max-w-full overflow-hidden ${
+              value.isRemote ? "h-0 opacity-0" : "h-64 opacity-100"
+            }`}
+            aria-hidden={value.isRemote}
+          >
+            <div
+              ref={mapContainerRef}
+              className="h-64 min-w-0 max-w-full overflow-hidden rounded-lg border bg-muted"
+              aria-label="Task location map"
+            />
+          </div>
+        ) : null}
+
+        {!value.isRemote && !MAPBOX_ACCESS_TOKEN ? (
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-2">
+              <Label htmlFor="task-location-latitude">Latitude</Label>
+              <Input
+                id="task-location-latitude"
+                type="number"
+                min="-90"
+                max="90"
+                step="any"
+                value={value.latitude ?? ""}
+                onChange={(event) =>
+                  onChange({
+                    ...value,
+                    latitude: event.target.value ? Number(event.target.value) : undefined,
+                  })
+                }
+                disabled={disabled}
               />
             </div>
-          ) : (
-            <Input
-              value={value.label}
-              onChange={(event) => onChange({ ...value, label: event.target.value })}
-              placeholder="Location label"
-              disabled={disabled}
-            />
-          )}
-
-          <div
-            ref={mapContainerRef}
-            className="h-64 min-w-0 max-w-full overflow-hidden rounded-lg border bg-muted"
-            aria-label="Task location map"
-          />
-
-          {!MAPBOX_ACCESS_TOKEN ? (
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="grid gap-2">
-                <Label htmlFor="task-location-latitude">Latitude</Label>
-                <Input
-                  id="task-location-latitude"
-                  type="number"
-                  min="-90"
-                  max="90"
-                  step="any"
-                  value={value.latitude ?? ""}
-                  onChange={(event) =>
-                    onChange({
-                      ...value,
-                      latitude: event.target.value ? Number(event.target.value) : undefined,
-                    })
-                  }
-                  disabled={disabled}
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="task-location-longitude">Longitude</Label>
-                <Input
-                  id="task-location-longitude"
-                  type="number"
-                  min="-180"
-                  max="180"
-                  step="any"
-                  value={value.longitude ?? ""}
-                  onChange={(event) =>
-                    onChange({
-                      ...value,
-                      longitude: event.target.value ? Number(event.target.value) : undefined,
-                    })
-                  }
-                  disabled={disabled}
-                />
-              </div>
+            <div className="grid gap-2">
+              <Label htmlFor="task-location-longitude">Longitude</Label>
+              <Input
+                id="task-location-longitude"
+                type="number"
+                min="-180"
+                max="180"
+                step="any"
+                value={value.longitude ?? ""}
+                onChange={(event) =>
+                  onChange({
+                    ...value,
+                    longitude: event.target.value ? Number(event.target.value) : undefined,
+                  })
+                }
+                disabled={disabled}
+              />
             </div>
-          ) : null}
-        </div>
-      )}
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }
