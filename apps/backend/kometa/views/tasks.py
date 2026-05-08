@@ -72,7 +72,13 @@ class TaskViewSet(
                 Q(owner=self.request.user) | Q(selected_response__provider=self.request.user)
             )
         if available_param == 'true':
-            queryset = queryset.filter(status='open').exclude(owner=self.request.user)
+            queryset = (
+                queryset
+                .filter(status='open')
+                .exclude(owner=self.request.user)
+                .exclude(responses__provider=self.request.user)
+                .distinct()
+            )
 
         return queryset
 

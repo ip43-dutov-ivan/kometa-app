@@ -1,6 +1,8 @@
 from rest_framework import status
 from rest_framework.test import APITestCase
 
+from kometa.models import TaskResponse
+
 from .factories import create_task, create_user, task_payload
 from .helpers import auth_client
 
@@ -64,6 +66,49 @@ class TaskEndpointTests(APITestCase):
         facets_response = self.other_client.get('/api/v1/tasks/location-facets?available=true&status=open')
         self.assertEqual(facets_response.status_code, status.HTTP_200_OK)
         self.assertEqual(facets_response.json(), [{'id': 'ua-kyiv', 'label': 'Kyiv', 'count': 1}])
+
+    def test_available_tasks_exclude_tasks_current_user_already_responded_to(self):
+        answered_task = create_task(
+            owner=self.owner,
+            title='Answered task',
+            location={
+                'label': 'Kyiv, KPI',
+                'isRemote': False,
+                'latitude': 50.4499,
+                'longitude': 30.4615,
+                'cityId': 'ua-kyiv',
+                'cityLabel': 'Kyiv',
+                'countryCode': 'UA',
+            },
+        )
+        available_task = create_task(
+            owner=self.owner,
+            title='Available task',
+            location={
+                'label': 'Lviv, Center',
+                'isRemote': False,
+                'latitude': 49.8397,
+                'longitude': 24.0297,
+                'cityId': 'ua-lviv',
+                'cityLabel': 'Lviv',
+                'countryCode': 'UA',
+            },
+        )
+        TaskResponse.objects.create(
+            task=answered_task,
+            provider=self.other_user,
+            comment='I can help',
+            status='pending',
+        )
+
+        response = self.other_client.get('/api/v1/tasks?available=true&limit=10')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json()['pageInfo']['total'], 1)
+        self.assertEqual(response.json()['items'][0]['id'], str(available_task.id))
+
+        facets_response = self.other_client.get('/api/v1/tasks/location-facets?available=true&status=open')
+        self.assertEqual(facets_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(facets_response.json(), [{'id': 'ua-lviv', 'label': 'Lviv', 'count': 1}])
 
     def test_task_update_methods_are_not_available(self):
         task = create_task(owner=self.owner)

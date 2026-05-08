@@ -1,6 +1,13 @@
 import { TaskDetailPage } from "@/features/tasks";
 
-export default async function TaskPage({ params }: { params: Promise<{ taskId: string }> }) {
+export default async function TaskPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ taskId: string }>;
+  searchParams: Promise<{ returnToConversationId?: string }>;
+}) {
   const { taskId } = await params;
-  return <TaskDetailPage taskId={taskId} />;
+  const { returnToConversationId } = await searchParams;
+  return <TaskDetailPage taskId={taskId} returnToConversationId={returnToConversationId} />;
 }

@@ -277,6 +277,10 @@ export function ChatPage({ conversationId }: { conversationId: string }) {
   const otherParticipantReadState = conversation.readStates.find(
     (readState) => readState.userId === String(otherUserId),
   );
+  const taskHref =
+    task?.ownerId === user?.id
+      ? `/app/my-tasks/${conversation.taskId}?returnToConversationId=${encodeURIComponent(conversationId)}`
+      : `/app/tasks/${conversation.taskId}?returnToConversationId=${encodeURIComponent(conversationId)}`;
 
   return (
     <div className="grid gap-5">
@@ -287,7 +291,7 @@ export function ChatPage({ conversationId }: { conversationId: string }) {
         </div>
         <div className="flex gap-2">
           <Button asChild variant="outline">
-            <Link href={`/app/tasks/${conversation.taskId}`}>{t("Task")}</Link>
+            <Link href={taskHref}>{t("Task")}</Link>
           </Button>
           {otherUserId ? (
             <Button asChild variant="ghost">

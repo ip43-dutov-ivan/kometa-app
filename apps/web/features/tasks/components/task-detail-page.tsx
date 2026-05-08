@@ -3,6 +3,7 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { t } from "@kometa/i18n";
 import { ArrowLeft, ShieldAlert } from "lucide-react";
 import type { CompletionRequest, Match, ResponseStatus, Task, User } from "@kometa/logic";
@@ -18,9 +19,11 @@ import { TaskDetailActions } from "./task-detail-actions";
 export function TaskDetailPage({
   taskId,
   scope = "discovery",
+  returnToConversationId,
 }: {
   taskId: string;
   scope?: "discovery" | "owned";
+  returnToConversationId?: string;
 }) {
   const router = useRouter();
   const { user, hasHydrated } = useKometaSession();
@@ -101,16 +104,19 @@ export function TaskDetailPage({
     event.preventDefault();
     const form = event.currentTarget;
     const comment = String(new FormData(form).get("comment") ?? "");
+    const previousSubmittedResponse = submittedResponse;
     setIsMutating(true);
     setError(null);
+    setSubmittedResponse("pending");
     try {
       await kometaApi.tasks.respond(taskId, { comment });
       form.reset();
-      await loadTask();
     } catch (caughtError) {
-      setError(
-        caughtError instanceof Error ? caughtError.message : t("Response submission failed."),
-      );
+      const message =
+        caughtError instanceof Error ? caughtError.message : t("Response submission failed.");
+      setSubmittedResponse(previousSubmittedResponse);
+      setError(message);
+      toast.error(message);
     } finally {
       setIsMutating(false);
     }
@@ -232,14 +238,23 @@ export function TaskDetailPage({
   const reportHref = reportedUserId
     ? `/app/reports/new?reportedUserId=${reportedUserId}&taskId=${task.id}`
     : null;
-  const backHref = scope === "owned" ? "/app/my-tasks" : "/app/tasks";
+  const chatBackHref =
+    returnToConversationId && match?.conversationId === returnToConversationId
+      ? `/app/conversations/${encodeURIComponent(returnToConversationId)}`
+      : null;
+  const backHref = chatBackHref ?? (scope === "owned" ? "/app/my-tasks" : "/app/tasks");
+  const backLabel = chatBackHref
+    ? t("Back to chat")
+    : scope === "owned"
+      ? t("Back to my tasks")
+      : t("Back to discovery");
 
   return (
     <div className="grid gap-5">
       <Button asChild variant="ghost" className="w-fit">
         <Link href={backHref}>
           <ArrowLeft />
-          {scope === "owned" ? t("Back to my tasks") : t("Back to discovery")}
+          {backLabel}
         </Link>
       </Button>
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">

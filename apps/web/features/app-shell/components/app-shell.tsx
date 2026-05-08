@@ -9,7 +9,6 @@ import {
   ChevronDown,
   ClipboardList,
   Compass,
-  Inbox,
   Languages,
   LogOut,
   Menu,
@@ -17,7 +16,6 @@ import {
   Moon,
   Sun,
   UserRound,
-  UsersRound,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import type { Locale } from "@kometa/i18n";
@@ -53,14 +51,10 @@ import { cn } from "@/lib/utils";
 const primaryNavItems = [
   { href: "/app/tasks", label: "Discover", icon: Compass },
   { href: "/app/my-tasks", label: "My tasks", icon: ClipboardList },
-  { href: "/app/conversations", label: "Chat", icon: MessageSquare },
+  { href: "/app/conversations", label: "Inbox", icon: MessageSquare },
 ];
 
-const secondaryNavItems = [
-  { href: "/app/my-responses", label: "Responses", icon: Inbox },
-  { href: "/app/matches", label: "Matches", icon: UsersRound },
-  { href: "/app/profile", label: "Profile", icon: UserRound },
-];
+const secondaryNavItems = [{ href: "/app/profile", label: "Profile", icon: UserRound }];
 
 const localeOptions: Array<{ value: Locale; label: string; shortLabel: string }> = [
   { value: "en", label: "English", shortLabel: "EN" },
@@ -74,6 +68,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [pendingOwnerResponseCount, setPendingOwnerResponseCount] = useState(0);
   const { hasHydrated, isAuthenticated, user, clearSession } = useKometaSession();
   const totalUnreadChatCount = useStore(chatRealtimeStore, selectTotalUnreadChatCount);
+  const inboxNotificationCount = totalUnreadChatCount + pendingOwnerResponseCount;
 
   useEffect(() => {
     if (hasHydrated && !isAuthenticated) {
@@ -193,9 +188,9 @@ export function AppShell({ children }: { children: ReactNode }) {
                       {pendingOwnerResponseCount}
                     </Badge>
                   ) : null}
-                  {item.href === "/app/conversations" && totalUnreadChatCount ? (
+                  {item.href === "/app/conversations" && inboxNotificationCount ? (
                     <Badge variant="default" className="ml-auto h-5 min-w-5 px-1.5">
-                      {totalUnreadChatCount}
+                      {inboxNotificationCount}
                     </Badge>
                   ) : null}
                 </Link>
@@ -247,9 +242,9 @@ export function AppShell({ children }: { children: ReactNode }) {
                         {pendingOwnerResponseCount}
                       </Badge>
                     ) : null}
-                    {item.href === "/app/conversations" && totalUnreadChatCount ? (
+                    {item.href === "/app/conversations" && inboxNotificationCount ? (
                       <Badge className="absolute right-1 top-1 h-5 min-w-5 px-1 text-[0.625rem]">
-                        {totalUnreadChatCount}
+                        {inboxNotificationCount}
                       </Badge>
                     ) : null}
                   </Link>
