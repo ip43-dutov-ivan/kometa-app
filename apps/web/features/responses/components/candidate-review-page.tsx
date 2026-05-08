@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Check, ShieldAlert, UserRound } from "lucide-react";
+import { t } from "@kometa/i18n";
 import type { Task, TaskResponse, User } from "@kometa/logic";
 import { kometaApi } from "@/shared/api/client";
 import { EmptyState, ErrorState, LoadingState } from "@/shared/components/page-state";
@@ -39,7 +40,7 @@ export function CandidateReviewPage({ taskId }: { taskId: string }) {
       setTask(nextTask);
       setCandidates(nextCandidates);
     } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : "Responses failed to load.");
+      setError(caughtError instanceof Error ? caughtError.message : t("Responses failed to load."));
     } finally {
       setIsLoading(false);
     }
@@ -56,22 +57,24 @@ export function CandidateReviewPage({ taskId }: { taskId: string }) {
       const match = await kometaApi.tasks.acceptResponse(taskId, responseId);
       window.location.href = `/app/conversations/${match.conversationId}`;
     } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : "Response acceptance failed.");
+      setError(
+        caughtError instanceof Error ? caughtError.message : t("Response acceptance failed."),
+      );
     } finally {
       setAcceptingId(null);
     }
   }
 
   if (isLoading) {
-    return <LoadingState label="Loading candidates" />;
+    return <LoadingState label={t("Loading candidates")} />;
   }
 
   return (
     <div className="grid gap-5">
       <div>
-        <h1 className="font-heading text-3xl font-semibold">Candidate review</h1>
+        <h1 className="font-heading text-3xl font-semibold">{t("Candidate review")}</h1>
         <p className="mt-2 text-muted-foreground">
-          {task ? task.title : "Review submitted task responses."}
+          {task ? task.title : t("Review submitted task responses.")}
         </p>
       </div>
       {error ? <ErrorState message={error} /> : null}
@@ -81,9 +84,11 @@ export function CandidateReviewPage({ taskId }: { taskId: string }) {
             <Card key={response.id} className="rounded-lg">
               <CardHeader>
                 <div className="flex flex-wrap gap-2">
-                  <Badge variant="outline">{response.status}</Badge>
+                  <Badge variant="outline">{t(response.status)}</Badge>
                   {provider ? (
-                    <Badge variant="secondary">{provider.rating.toFixed(1)} rating</Badge>
+                    <Badge variant="secondary">
+                      {provider.rating.toFixed(1)} {t("rating")}
+                    </Badge>
                   ) : null}
                 </div>
                 <CardTitle className="text-xl">{provider?.name ?? response.providerId}</CardTitle>
@@ -92,7 +97,7 @@ export function CandidateReviewPage({ taskId }: { taskId: string }) {
                 <p className="text-sm leading-6 text-muted-foreground">{response.comment}</p>
                 {provider ? (
                   <p className="text-sm">
-                    {provider.location} · {provider.completedTasks} completed tasks
+                    {provider.location} · {provider.completedTasks} {t("completed tasks")}
                   </p>
                 ) : null}
               </CardContent>
@@ -100,7 +105,7 @@ export function CandidateReviewPage({ taskId }: { taskId: string }) {
                 <Button asChild variant="outline">
                   <Link href={`/app/users/${response.providerId}`}>
                     <UserRound />
-                    Profile
+                    {t("Profile")}
                   </Link>
                 </Button>
                 <Button asChild variant="ghost">
@@ -108,7 +113,7 @@ export function CandidateReviewPage({ taskId }: { taskId: string }) {
                     href={`/app/reports/new?reportedUserId=${response.providerId}&taskId=${taskId}`}
                   >
                     <ShieldAlert />
-                    Report
+                    {t("Report")}
                   </Link>
                 </Button>
                 <Button
@@ -120,14 +125,17 @@ export function CandidateReviewPage({ taskId }: { taskId: string }) {
                   }
                 >
                   <Check />
-                  {acceptingId === response.id ? "Accepting" : "Accept"}
+                  {acceptingId === response.id ? t("Accepting") : t("Accept")}
                 </Button>
               </CardFooter>
             </Card>
           ))}
         </div>
       ) : (
-        <EmptyState title="No responses yet" body="New candidate responses will appear here." />
+        <EmptyState
+          title={t("No responses yet")}
+          body={t("New candidate responses will appear here.")}
+        />
       )}
     </div>
   );

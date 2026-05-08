@@ -1,5 +1,7 @@
 "use client";
 
+import { t } from "@kometa/i18n";
+
 const tasks = [
   "Help me assemble IKEA desk",
   "Walk my dog",
@@ -33,7 +35,7 @@ export function TaskTicker() {
               key={`first-${index}`}
               className="flex-shrink-0 mx-3 px-5 py-2.5 rounded-full border border-border bg-card text-sm text-muted-foreground whitespace-nowrap hover:border-primary/50 hover:text-foreground transition-colors"
             >
-              {task}
+              {t(task)}
             </div>
           ))}
           {/* Duplicate for seamless loop */}
@@ -42,7 +44,7 @@ export function TaskTicker() {
               key={`second-${index}`}
               className="flex-shrink-0 mx-3 px-5 py-2.5 rounded-full border border-border bg-card text-sm text-muted-foreground whitespace-nowrap hover:border-primary/50 hover:text-foreground transition-colors"
             >
-              {task}
+              {t(task)}
             </div>
           ))}
         </div>

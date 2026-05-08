@@ -3,6 +3,7 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Save, Star } from "lucide-react";
+import { t } from "@kometa/i18n";
 import type { Feedback, Task } from "@kometa/logic";
 import { kometaApi } from "@/shared/api/client";
 import { EmptyState, ErrorState, LoadingState } from "@/shared/components/page-state";
@@ -29,7 +30,7 @@ export function TaskFeedbackPage({ taskId }: { taskId: string }) {
       setTask(nextTask);
       setFeedback(nextFeedback);
     } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : "Feedback failed to load.");
+      setError(caughtError instanceof Error ? caughtError.message : t("Feedback failed to load."));
     } finally {
       setIsLoading(false);
     }
@@ -53,21 +54,23 @@ export function TaskFeedbackPage({ taskId }: { taskId: string }) {
       form.reset();
       await loadFeedback();
     } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : "Feedback submission failed.");
+      setError(
+        caughtError instanceof Error ? caughtError.message : t("Feedback submission failed."),
+      );
     } finally {
       setIsSubmitting(false);
     }
   }
 
   if (isLoading) {
-    return <LoadingState label="Loading feedback" />;
+    return <LoadingState label={t("Loading feedback")} />;
   }
 
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
       <section className="grid gap-5">
         <div>
-          <h1 className="font-heading text-3xl font-semibold">Task feedback</h1>
+          <h1 className="font-heading text-3xl font-semibold">{t("Task feedback")}</h1>
           <p className="mt-2 text-muted-foreground">{task?.title ?? taskId}</p>
         </div>
         {error ? <ErrorState message={error} /> : null}
@@ -88,31 +91,31 @@ export function TaskFeedbackPage({ taskId }: { taskId: string }) {
             ))}
           </div>
         ) : (
-          <EmptyState title="No feedback yet" body="Feedback appears after completion." />
+          <EmptyState title={t("No feedback yet")} body={t("Feedback appears after completion.")} />
         )}
       </section>
       <aside className="h-fit rounded-lg border p-5">
         <form className="grid gap-4" onSubmit={leaveFeedback}>
           <div>
-            <h2 className="font-heading text-xl font-semibold">Leave feedback</h2>
+            <h2 className="font-heading text-xl font-semibold">{t("Leave feedback")}</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Available once the task is completed.
+              {t("Available once the task is completed.")}
             </p>
           </div>
           <div className="grid gap-2">
-            <Label htmlFor="rating">Rating</Label>
+            <Label htmlFor="rating">{t("Rating")}</Label>
             <Input id="rating" name="rating" type="number" min={1} max={5} defaultValue={5} />
           </div>
           <div className="grid gap-2">
-            <Label htmlFor="comment">Comment</Label>
+            <Label htmlFor="comment">{t("Comment")}</Label>
             <Textarea id="comment" name="comment" rows={5} required />
           </div>
           <Button type="submit" disabled={isSubmitting || task?.status !== "completed"}>
             <Save />
-            {isSubmitting ? "Saving" : "Submit feedback"}
+            {isSubmitting ? t("Saving") : t("Submit feedback")}
           </Button>
           <Button asChild variant="ghost">
-            <Link href={`/app/tasks/${taskId}`}>Back to task</Link>
+            <Link href={`/app/tasks/${taskId}`}>{t("Back to task")}</Link>
           </Button>
         </form>
       </aside>

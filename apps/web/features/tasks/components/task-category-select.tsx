@@ -1,5 +1,6 @@
 "use client";
 
+import { t } from "@kometa/i18n";
 import {
   getTaskCategoryLabel,
   normalizeTaskCategoryId,
@@ -25,9 +26,9 @@ export function TaskCategorySelect({
   value,
   onValueChange,
   name,
-  placeholder = "Select category",
-  searchPlaceholder = "Search categories...",
-  emptyMessage = "No category found.",
+  placeholder = t("Select category"),
+  searchPlaceholder = t("Search categories..."),
+  emptyMessage = t("No category found."),
   disabled = false,
 }: TaskCategorySelectProps) {
   const normalizedValue = value ? normalizeTaskCategoryId(value) : "";

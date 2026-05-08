@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { MessageSquare } from "lucide-react";
+import { t } from "@kometa/i18n";
 import type { Conversation, Task } from "@kometa/logic";
 import { kometaApi } from "@/shared/api/client";
 import { EmptyState, ErrorState, LoadingState } from "@/shared/components/page-state";
@@ -37,7 +38,7 @@ export function ConversationListPage() {
       } catch (caughtError) {
         if (isActive) {
           setError(
-            caughtError instanceof Error ? caughtError.message : "Conversations failed to load.",
+            caughtError instanceof Error ? caughtError.message : t("Conversations failed to load."),
           );
         }
       } finally {
@@ -56,12 +57,14 @@ export function ConversationListPage() {
   return (
     <div className="grid gap-5">
       <div>
-        <h1 className="font-heading text-3xl font-semibold">Conversations</h1>
-        <p className="mt-2 text-muted-foreground">Task-scoped chats available after a match.</p>
+        <h1 className="font-heading text-3xl font-semibold">{t("Conversations")}</h1>
+        <p className="mt-2 text-muted-foreground">
+          {t("Task-scoped chats available after a match.")}
+        </p>
       </div>
       {error ? <ErrorState message={error} /> : null}
       {isLoading ? (
-        <LoadingState label="Loading conversations" />
+        <LoadingState label={t("Loading conversations")} />
       ) : items.length ? (
         <div className="grid gap-4 md:grid-cols-2">
           {items.map(({ conversation, task }) => (
@@ -70,13 +73,13 @@ export function ConversationListPage() {
                 <CardTitle className="text-xl">{task?.title ?? conversation.taskId}</CardTitle>
               </CardHeader>
               <CardContent className="text-sm text-muted-foreground">
-                Last message {new Date(conversation.lastMessageAt).toLocaleString()}
+                {t("Last message")} {new Date(conversation.lastMessageAt).toLocaleString()}
               </CardContent>
               <CardFooter>
                 <Button asChild className="w-full">
                   <Link href={`/app/conversations/${conversation.id}`}>
                     <MessageSquare />
-                    Open chat
+                    {t("Open chat")}
                   </Link>
                 </Button>
               </CardFooter>
@@ -85,8 +88,8 @@ export function ConversationListPage() {
         </div>
       ) : (
         <EmptyState
-          title="No conversations"
-          body="Chats appear when a task response is accepted."
+          title={t("No conversations")}
+          body={t("Chats appear when a task response is accepted.")}
         />
       )}
     </div>

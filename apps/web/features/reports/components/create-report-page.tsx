@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ShieldAlert } from "lucide-react";
+import { t } from "@kometa/i18n";
 import type { Task, User } from "@kometa/logic";
 import { kometaApi } from "@/shared/api/client";
 import { ErrorState } from "@/shared/components/page-state";
@@ -49,7 +50,7 @@ export function CreateReportPage() {
       });
       router.push(taskId ? `/app/tasks/${taskId}` : `/app/users/${reportedUserId}`);
     } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : "Report submission failed.");
+      setError(caughtError instanceof Error ? caughtError.message : t("Report submission failed."));
     } finally {
       setIsSubmitting(false);
     }
@@ -58,30 +59,36 @@ export function CreateReportPage() {
   return (
     <div className="mx-auto grid max-w-2xl gap-5">
       <div>
-        <h1 className="font-heading text-3xl font-semibold">Create report</h1>
-        <p className="mt-2 text-muted-foreground">Report unsafe or problematic behavior.</p>
+        <h1 className="font-heading text-3xl font-semibold">{t("Create report")}</h1>
+        <p className="mt-2 text-muted-foreground">{t("Report unsafe or problematic behavior.")}</p>
       </div>
       {error ? <ErrorState message={error} /> : null}
       <Card className="rounded-lg">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <ShieldAlert />
-            Report summary
+            {t("Report summary")}
           </CardTitle>
         </CardHeader>
         <CardContent className="grid gap-4">
           <div className="grid gap-1 text-sm">
-            <span>Reported user: {reportedUser?.name ?? (reportedUserId || "Missing")}</span>
-            {taskId ? <span>Task: {task?.title ?? taskId}</span> : null}
+            <span>
+              {t("Reported user")}: {reportedUser?.name ?? (reportedUserId || t("Missing"))}
+            </span>
+            {taskId ? (
+              <span>
+                {t("Task")}: {task?.title ?? taskId}
+              </span>
+            ) : null}
           </div>
           <form className="grid gap-4" onSubmit={submitReport}>
             <div className="grid gap-2">
-              <Label htmlFor="reason">Reason</Label>
+              <Label htmlFor="reason">{t("Reason")}</Label>
               <Textarea id="reason" name="reason" rows={6} required />
             </div>
             <Button type="submit" disabled={isSubmitting || !reportedUserId}>
               <ShieldAlert />
-              {isSubmitting ? "Submitting" : "Submit report"}
+              {isSubmitting ? t("Submitting") : t("Submit report")}
             </Button>
           </form>
         </CardContent>

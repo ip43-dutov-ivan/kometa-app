@@ -3,6 +3,7 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Send, ShieldAlert } from "lucide-react";
+import { t } from "@kometa/i18n";
 import type { Conversation, Message, Task } from "@kometa/logic";
 import { kometaApi } from "@/shared/api/client";
 import { EmptyState, ErrorState, LoadingState } from "@/shared/components/page-state";
@@ -32,7 +33,7 @@ export function ChatPage({ conversationId }: { conversationId: string }) {
       setMessages(nextMessages);
       setTask(nextTask);
     } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : "Chat failed to load.");
+      setError(caughtError instanceof Error ? caughtError.message : t("Chat failed to load."));
     } finally {
       setIsLoading(false);
     }
@@ -58,18 +59,22 @@ export function ChatPage({ conversationId }: { conversationId: string }) {
       setMessages((current) => [...current, message]);
       form.reset();
     } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : "Message failed to send.");
+      setError(caughtError instanceof Error ? caughtError.message : t("Message failed to send."));
     } finally {
       setIsSending(false);
     }
   }
 
   if (isLoading) {
-    return <LoadingState label="Loading chat" />;
+    return <LoadingState label={t("Loading chat")} />;
   }
 
   if (!conversation) {
-    return error ? <ErrorState message={error} /> : <EmptyState title="Conversation not found" />;
+    return error ? (
+      <ErrorState message={error} />
+    ) : (
+      <EmptyState title={t("Conversation not found")} />
+    );
   }
 
   const otherUserId = conversation.participantIds.find(
@@ -80,12 +85,12 @@ export function ChatPage({ conversationId }: { conversationId: string }) {
     <div className="grid gap-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="font-heading text-3xl font-semibold">{task?.title ?? "Task chat"}</h1>
-          <p className="mt-2 text-muted-foreground">Coordinate details after the match.</p>
+          <h1 className="font-heading text-3xl font-semibold">{task?.title ?? t("Task chat")}</h1>
+          <p className="mt-2 text-muted-foreground">{t("Coordinate details after the match.")}</p>
         </div>
         <div className="flex gap-2">
           <Button asChild variant="outline">
-            <Link href={`/app/tasks/${conversation.taskId}`}>Task</Link>
+            <Link href={`/app/tasks/${conversation.taskId}`}>{t("Task")}</Link>
           </Button>
           {otherUserId ? (
             <Button asChild variant="ghost">
@@ -93,7 +98,7 @@ export function ChatPage({ conversationId }: { conversationId: string }) {
                 href={`/app/reports/new?reportedUserId=${otherUserId}&taskId=${conversation.taskId}`}
               >
                 <ShieldAlert />
-                Report
+                {t("Report")}
               </Link>
             </Button>
           ) : null}
@@ -102,7 +107,7 @@ export function ChatPage({ conversationId }: { conversationId: string }) {
       {error ? <ErrorState message={error} /> : null}
       <Card className="rounded-lg">
         <CardHeader>
-          <CardTitle>Messages</CardTitle>
+          <CardTitle>{t("Messages")}</CardTitle>
         </CardHeader>
         <CardContent className="grid max-h-[55vh] gap-3 overflow-y-auto">
           {messages.length ? (
@@ -122,15 +127,18 @@ export function ChatPage({ conversationId }: { conversationId: string }) {
               </div>
             ))
           ) : (
-            <EmptyState title="No messages yet" body="Send the first coordination message." />
+            <EmptyState
+              title={t("No messages yet")}
+              body={t("Send the first coordination message.")}
+            />
           )}
         </CardContent>
       </Card>
       <form className="grid gap-3 rounded-lg border p-4" onSubmit={sendMessage}>
-        <Textarea name="body" rows={3} placeholder="Write a message" required />
+        <Textarea name="body" rows={3} placeholder={t("Write a message")} required />
         <Button type="submit" disabled={isSending} className="justify-self-end">
           <Send />
-          {isSending ? "Sending" : "Send"}
+          {isSending ? t("Sending") : t("Send")}
         </Button>
       </form>
     </div>

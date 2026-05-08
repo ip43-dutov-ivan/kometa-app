@@ -3,6 +3,7 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { t } from "@kometa/i18n";
 import {
   ArrowLeft,
   Check,
@@ -86,7 +87,7 @@ export function TaskDetailPage({
         myResponses.items.find((response) => response.taskId === taskId)?.status ?? null,
       );
     } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : "Task failed to load.");
+      setError(caughtError instanceof Error ? caughtError.message : t("Task failed to load."));
     } finally {
       setIsLoading(false);
     }
@@ -121,7 +122,9 @@ export function TaskDetailPage({
       form.reset();
       await loadTask();
     } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : "Response submission failed.");
+      setError(
+        caughtError instanceof Error ? caughtError.message : t("Response submission failed."),
+      );
     } finally {
       setIsMutating(false);
     }
@@ -138,7 +141,7 @@ export function TaskDetailPage({
       await kometaApi.tasks.delete(taskId);
       router.push("/app/my-tasks");
     } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : "Task deletion failed.");
+      setError(caughtError instanceof Error ? caughtError.message : t("Task deletion failed."));
     } finally {
       setIsMutating(false);
     }
@@ -154,7 +157,9 @@ export function TaskDetailPage({
       setLastCompletionRequestId(response.completionRequest.id);
       setTask(response.task);
     } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : "Completion request failed.");
+      setError(
+        caughtError instanceof Error ? caughtError.message : t("Completion request failed."),
+      );
     } finally {
       setIsMutating(false);
     }
@@ -164,7 +169,7 @@ export function TaskDetailPage({
     event.preventDefault();
     const requestId = completionRequestId(event.currentTarget);
     if (!requestId) {
-      setError("Completion request id is required by the API contract.");
+      setError(t("Completion request id is required by the API contract."));
       return;
     }
     setIsMutating(true);
@@ -174,7 +179,7 @@ export function TaskDetailPage({
       setTask(response.task);
     } catch (caughtError) {
       setError(
-        caughtError instanceof Error ? caughtError.message : "Completion confirmation failed.",
+        caughtError instanceof Error ? caughtError.message : t("Completion confirmation failed."),
       );
     } finally {
       setIsMutating(false);
@@ -186,7 +191,7 @@ export function TaskDetailPage({
     const formData = new FormData(event.currentTarget);
     const requestId = completionRequestId(event.currentTarget);
     if (!requestId) {
-      setError("Completion request id is required by the API contract.");
+      setError(t("Completion request id is required by the API contract."));
       return;
     }
     setIsMutating(true);
@@ -197,7 +202,9 @@ export function TaskDetailPage({
       });
       setTask(response.task);
     } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : "Completion concern failed.");
+      setError(
+        caughtError instanceof Error ? caughtError.message : t("Completion concern failed."),
+      );
     } finally {
       setIsMutating(false);
     }
@@ -209,7 +216,7 @@ export function TaskDetailPage({
     try {
       setTask(await mutation());
     } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : "Task update failed.");
+      setError(caughtError instanceof Error ? caughtError.message : t("Task update failed."));
     } finally {
       setIsMutating(false);
     }
@@ -220,11 +227,11 @@ export function TaskDetailPage({
   }
 
   if (!hasHydrated || isLoading) {
-    return <LoadingState label="Loading task" />;
+    return <LoadingState label={t("Loading task")} />;
   }
 
   if (!task) {
-    return error ? <ErrorState message={error} /> : <EmptyState title="Task not found" />;
+    return error ? <ErrorState message={error} /> : <EmptyState title={t("Task not found")} />;
   }
 
   const owner = isTaskOwner(task, user?.id);
@@ -244,7 +251,7 @@ export function TaskDetailPage({
       <Button asChild variant="ghost" className="w-fit">
         <Link href={backHref}>
           <ArrowLeft />
-          {scope === "owned" ? "Back to my tasks" : "Back to discovery"}
+          {scope === "owned" ? t("Back to my tasks") : t("Back to discovery")}
         </Link>
       </Button>
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
@@ -252,14 +259,14 @@ export function TaskDetailPage({
           <div>
             <div className="mb-3 flex flex-wrap gap-2">
               <Badge variant="secondary">{getTaskCategoryLabel(task.category)}</Badge>
-              <Badge variant="outline">{task.status}</Badge>
+              <Badge variant="outline">{t(task.status)}</Badge>
             </div>
             <h1 className="font-heading text-3xl font-semibold">{task.title}</h1>
             <p className="mt-2 text-muted-foreground">{getTaskLocationLabel(task.location)}</p>
           </div>
           <Card className="rounded-lg">
             <CardHeader>
-              <CardTitle>Description</CardTitle>
+              <CardTitle>{t("Description")}</CardTitle>
             </CardHeader>
             <CardContent>
               <p className="whitespace-pre-wrap leading-7">{task.description}</p>
@@ -268,15 +275,21 @@ export function TaskDetailPage({
         </section>
         <aside className="grid h-fit gap-4 rounded-lg border p-5">
           <div>
-            <p className="text-sm text-muted-foreground">Compensation</p>
+            <p className="text-sm text-muted-foreground">{t("Compensation")}</p>
             <p className="font-heading text-2xl font-semibold">
               {task.compensation.amount} {task.compensation.currency}
             </p>
           </div>
           <div className="grid gap-2 text-sm">
-            <span>Created {new Date(task.createdAt).toLocaleDateString()}</span>
-            <span>{owner ? "You own this task" : "Contextual participant actions"}</span>
-            {otherUser ? <span>Counterpart: {otherUser.name}</span> : null}
+            <span>
+              {t("Created")} {new Date(task.createdAt).toLocaleDateString()}
+            </span>
+            <span>{owner ? t("You own this task") : t("Contextual participant actions")}</span>
+            {otherUser ? (
+              <span>
+                {t("Counterpart")}: {otherUser.name}
+              </span>
+            ) : null}
           </div>
           {error ? <ErrorState message={error} /> : null}
           <div className="grid gap-2">
@@ -285,7 +298,7 @@ export function TaskDetailPage({
               <Button asChild variant="ghost">
                 <Link href={reportHref}>
                   <ShieldAlert />
-                  Report
+                  {t("Report")}
                 </Link>
               </Button>
             ) : null}
@@ -302,32 +315,34 @@ export function TaskDetailPage({
           <Button asChild variant="outline">
             <Link href={`/app/tasks/new?duplicateFrom=${encodeURIComponent(activeTask.id)}`}>
               <Copy />
-              Duplicate task
+              {t("Duplicate task")}
             </Link>
           </Button>
           <Button asChild>
             <Link href={`/app/tasks/${activeTask.id}/responses`}>
               <MessageSquare />
-              View responses
+              {t("View responses")}
             </Link>
           </Button>
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button variant="destructive" disabled={isMutating}>
                 <Trash2 />
-                Delete task
+                {t("Delete task")}
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
               <AlertDialogHeader>
-                <AlertDialogTitle>Delete this task?</AlertDialogTitle>
+                <AlertDialogTitle>{t("Delete this task?")}</AlertDialogTitle>
                 <AlertDialogDescription>
-                  This cancels the task and declines pending responses. The task history is kept.
+                  {t(
+                    "This cancels the task and declines pending responses. The task history is kept.",
+                  )}
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={cancelTask}>Delete task</AlertDialogAction>
+                <AlertDialogCancel>{t("Cancel")}</AlertDialogCancel>
+                <AlertDialogAction onClick={cancelTask}>{t("Delete task")}</AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
@@ -335,10 +350,10 @@ export function TaskDetailPage({
       ) : (
         user && (
           <form className="grid gap-2" onSubmit={respond}>
-            <Textarea name="comment" rows={4} placeholder="How can you help?" required />
+            <Textarea name="comment" rows={4} placeholder={t("How can you help?")} required />
             <Button type="submit" disabled={isMutating || Boolean(submittedResponse)}>
               <Send />
-              {submittedResponse ? `Response ${submittedResponse}` : "Respond"}
+              {submittedResponse ? `${t("Response")} ${t(submittedResponse)}` : t("Respond")}
             </Button>
           </form>
         )
@@ -352,21 +367,21 @@ export function TaskDetailPage({
             <Button asChild>
               <Link href={`/app/conversations/${match.conversationId}`}>
                 <MessageSquare />
-                Open chat
+                {t("Open chat")}
               </Link>
             </Button>
           ) : null}
           {activeTask.status === "matched" ? (
             <Button variant="outline" onClick={startTask} disabled={isMutating}>
               <Flag />
-              Start task
+              {t("Start task")}
             </Button>
           ) : null}
           <form className="grid gap-2" onSubmit={requestCompletion}>
-            <Textarea name="note" rows={3} placeholder="Completion note" />
+            <Textarea name="note" rows={3} placeholder={t("Completion note")} />
             <Button type="submit" variant="outline" disabled={isMutating}>
               <Check />
-              Request completion
+              {t("Request completion")}
             </Button>
           </form>
         </>
@@ -379,23 +394,23 @@ export function TaskDetailPage({
           <form className="grid gap-2" onSubmit={confirmCompletion}>
             <Input
               name="requestId"
-              placeholder="Completion request id"
+              placeholder={t("Completion request id")}
               defaultValue={lastCompletionRequestId}
             />
             <Button type="submit" disabled={isMutating}>
               <Check />
-              Confirm completion
+              {t("Confirm completion")}
             </Button>
           </form>
           <form className="grid gap-2" onSubmit={raiseConcern}>
             <Input
               name="requestId"
-              placeholder="Completion request id"
+              placeholder={t("Completion request id")}
               defaultValue={lastCompletionRequestId}
             />
-            <Textarea name="reason" rows={3} placeholder="Concern reason" required />
+            <Textarea name="reason" rows={3} placeholder={t("Concern reason")} required />
             <Button type="submit" variant="outline" disabled={isMutating}>
-              Raise concern
+              {t("Raise concern")}
             </Button>
           </form>
         </>
@@ -407,7 +422,7 @@ export function TaskDetailPage({
         <Button asChild>
           <Link href={`/app/tasks/${activeTask.id}/feedback`}>
             <Check />
-            Feedback
+            {t("Feedback")}
           </Link>
         </Button>
       );

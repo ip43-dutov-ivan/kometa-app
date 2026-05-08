@@ -5,6 +5,7 @@ import type { ComponentProps } from "react";
 import { Geocoder } from "@mapbox/search-js-react";
 import mapboxgl from "mapbox-gl";
 import { useTheme } from "next-themes";
+import { t } from "@kometa/i18n";
 import type { TaskLocation } from "@kometa/logic";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -168,7 +169,7 @@ export function TaskLocationPicker({ value, onChange, disabled = false }: TaskLo
 
   function onRemoteChange(isRemote: boolean) {
     if (isRemote) {
-      onChange({ label: "Remote", isRemote: true });
+      onChange({ label: t("Remote"), isRemote: true });
       return;
     }
 
@@ -190,7 +191,7 @@ export function TaskLocationPicker({ value, onChange, disabled = false }: TaskLo
   return (
     <div className="grid min-w-0 max-w-full gap-3 overflow-hidden">
       <div className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2">
-        <Label htmlFor="task-location-remote">Remote task</Label>
+        <Label htmlFor="task-location-remote">{t("Remote task")}</Label>
         <Switch
           id="task-location-remote"
           checked={value.isRemote}
@@ -217,7 +218,7 @@ export function TaskLocationPicker({ value, onChange, disabled = false }: TaskLo
                   lng: KYIV_CENTER.longitude,
                 },
               }}
-              placeholder="Search for an address or place"
+              placeholder={t("Search for an address or place")}
               marker={false}
               theme={geocoderTheme}
             />
@@ -226,7 +227,7 @@ export function TaskLocationPicker({ value, onChange, disabled = false }: TaskLo
           <Input
             value={value.label}
             onChange={(event) => onChange({ ...value, label: event.target.value })}
-            placeholder="Location label"
+            placeholder={t("Location label")}
             disabled={disabled}
           />
         )}
@@ -241,7 +242,7 @@ export function TaskLocationPicker({ value, onChange, disabled = false }: TaskLo
             <div
               ref={mapContainerRef}
               className="h-64 min-w-0 max-w-full overflow-hidden rounded-lg border bg-muted"
-              aria-label="Task location map"
+              aria-label={t("Task location map")}
             />
           </div>
         ) : null}
@@ -249,7 +250,7 @@ export function TaskLocationPicker({ value, onChange, disabled = false }: TaskLo
         {!value.isRemote && !MAPBOX_ACCESS_TOKEN ? (
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="grid gap-2">
-              <Label htmlFor="task-location-latitude">Latitude</Label>
+              <Label htmlFor="task-location-latitude">{t("Latitude")}</Label>
               <Input
                 id="task-location-latitude"
                 type="number"
@@ -267,7 +268,7 @@ export function TaskLocationPicker({ value, onChange, disabled = false }: TaskLo
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="task-location-longitude">Longitude</Label>
+              <Label htmlFor="task-location-longitude">{t("Longitude")}</Label>
               <Input
                 id="task-location-longitude"
                 type="number"

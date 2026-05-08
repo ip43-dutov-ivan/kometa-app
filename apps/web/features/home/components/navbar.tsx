@@ -1,5 +1,6 @@
 "use client";
 
+import { t } from "@kometa/i18n";
 import { Button } from "@/components/ui/button";
 import { BrandLockup } from "./brand-lockup";
 
@@ -16,13 +17,13 @@ export function Navbar() {
               href="#how-it-works"
               className="text-sm text-muted-foreground hover:text-foreground transition-colors"
             >
-              How it works
+              {t("How it works")}
             </a>
             <a
               href="#manifesto"
               className="text-sm text-muted-foreground hover:text-foreground transition-colors"
             >
-              Manifesto
+              {t("Manifesto")}
             </a>
           </div>
 
@@ -31,7 +32,7 @@ export function Navbar() {
             className="rounded-full bg-primary text-primary-foreground hover:bg-primary/90 px-6"
             size="sm"
           >
-            Join Beta
+            {t("Join Beta")}
           </Button>
         </div>
       </div>

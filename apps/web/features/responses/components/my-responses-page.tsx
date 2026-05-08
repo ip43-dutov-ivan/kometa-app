@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ExternalLink } from "lucide-react";
+import { t } from "@kometa/i18n";
 import type { Task, TaskResponse } from "@kometa/logic";
 import { getTaskLocationLabel } from "@kometa/logic";
 import { kometaApi } from "@/shared/api/client";
@@ -39,7 +40,9 @@ export function MyResponsesPage() {
       } catch (caughtError) {
         if (isActive) {
           setError(
-            caughtError instanceof Error ? caughtError.message : "Your responses failed to load.",
+            caughtError instanceof Error
+              ? caughtError.message
+              : t("Your responses failed to load."),
           );
         }
       } finally {
@@ -58,20 +61,22 @@ export function MyResponsesPage() {
   return (
     <div className="grid gap-5">
       <div>
-        <h1 className="font-heading text-3xl font-semibold">My responses</h1>
-        <p className="mt-2 text-muted-foreground">Track offers you submitted to open tasks.</p>
+        <h1 className="font-heading text-3xl font-semibold">{t("My responses")}</h1>
+        <p className="mt-2 text-muted-foreground">
+          {t("Track offers you submitted to open tasks.")}
+        </p>
       </div>
       {error ? <ErrorState message={error} /> : null}
       {isLoading ? (
-        <LoadingState label="Loading responses" />
+        <LoadingState label={t("Loading responses")} />
       ) : items.length ? (
         <div className="grid gap-4 md:grid-cols-2">
           {items.map(({ response, task }) => (
             <Card key={response.id} className="rounded-lg">
               <CardHeader>
                 <div className="flex flex-wrap gap-2">
-                  <Badge variant="outline">{response.status}</Badge>
-                  {task ? <Badge variant="secondary">{task.status}</Badge> : null}
+                  <Badge variant="outline">{t(response.status)}</Badge>
+                  {task ? <Badge variant="secondary">{t(task.status)}</Badge> : null}
                 </div>
                 <CardTitle className="text-xl">{task?.title ?? response.taskId}</CardTitle>
               </CardHeader>
@@ -88,7 +93,7 @@ export function MyResponsesPage() {
                 <Button asChild variant="outline" className="w-full">
                   <Link href={`/app/tasks/${response.taskId}`}>
                     <ExternalLink />
-                    Open task
+                    {t("Open task")}
                   </Link>
                 </Button>
               </CardFooter>
@@ -96,7 +101,10 @@ export function MyResponsesPage() {
           ))}
         </div>
       ) : (
-        <EmptyState title="No responses yet" body="Respond to a task from discovery first." />
+        <EmptyState
+          title={t("No responses yet")}
+          body={t("Respond to a task from discovery first.")}
+        />
       )}
     </div>
   );

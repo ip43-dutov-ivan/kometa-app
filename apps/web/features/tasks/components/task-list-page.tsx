@@ -3,6 +3,7 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Plus, Search, X } from "lucide-react";
+import { t } from "@kometa/i18n";
 import type { Task } from "@kometa/logic";
 import { buildAvailableTasksQuery, buildOwnTasksQuery } from "@kometa/logic";
 import { kometaApi } from "@/shared/api/client";
@@ -29,7 +30,7 @@ export function TaskDiscoveryPage() {
       );
       setTasks(response.items);
     } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : "Tasks failed to load.");
+      setError(caughtError instanceof Error ? caughtError.message : t("Tasks failed to load."));
     } finally {
       setIsLoading(false);
     }
@@ -48,13 +49,15 @@ export function TaskDiscoveryPage() {
     <div className="grid gap-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="font-heading text-3xl font-semibold">Task discovery</h1>
-          <p className="mt-2 text-muted-foreground">Browse open tasks from other Kometa users.</p>
+          <h1 className="font-heading text-3xl font-semibold">{t("Task discovery")}</h1>
+          <p className="mt-2 text-muted-foreground">
+            {t("Browse open tasks from other Kometa users.")}
+          </p>
         </div>
         <Button asChild>
           <Link href="/app/tasks/new">
             <Plus />
-            Create task
+            {t("Create task")}
           </Link>
         </Button>
       </div>
@@ -63,20 +66,20 @@ export function TaskDiscoveryPage() {
         onSubmit={onSubmit}
       >
         <div className="grid gap-2">
-          <Label>Category</Label>
+          <Label>{t("Category")}</Label>
           <div className="flex gap-2">
             <TaskCategorySelect
               value={category}
               onValueChange={setCategory}
-              placeholder="All categories"
-              searchPlaceholder="Search categories..."
+              placeholder={t("All categories")}
+              searchPlaceholder={t("Search categories...")}
             />
             {category ? (
               <Button
                 type="button"
                 variant="outline"
                 size="icon"
-                aria-label="Clear category"
+                aria-label={t("Clear category")}
                 onClick={() => setCategory("")}
               >
                 <X />
@@ -85,7 +88,7 @@ export function TaskDiscoveryPage() {
           </div>
         </div>
         <div className="grid gap-2">
-          <Label htmlFor="location">Location</Label>
+          <Label htmlFor="location">{t("Location")}</Label>
           <Input
             id="location"
             value={location}
@@ -94,12 +97,12 @@ export function TaskDiscoveryPage() {
         </div>
         <Button type="submit" className="self-end">
           <Search />
-          Search
+          {t("Search")}
         </Button>
       </form>
       {error ? <ErrorState message={error} /> : null}
       {isLoading ? (
-        <LoadingState label="Loading tasks" />
+        <LoadingState label={t("Loading tasks")} />
       ) : tasks.length ? (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {tasks.map((task) => (
@@ -107,7 +110,7 @@ export function TaskDiscoveryPage() {
           ))}
         </div>
       ) : (
-        <EmptyState title="No tasks found" body="Try a broader category or location." />
+        <EmptyState title={t("No tasks found")} body={t("Try a broader category or location.")} />
       )}
     </div>
   );
@@ -129,7 +132,7 @@ export function MyTasksPage() {
       } catch (caughtError) {
         if (isActive) {
           setError(
-            caughtError instanceof Error ? caughtError.message : "Your tasks failed to load.",
+            caughtError instanceof Error ? caughtError.message : t("Your tasks failed to load."),
           );
         }
       } finally {
@@ -148,22 +151,23 @@ export function MyTasksPage() {
     <div className="grid gap-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="font-heading text-3xl font-semibold">My tasks</h1>
+          <h1 className="font-heading text-3xl font-semibold">{t("My tasks")}</h1>
           <p className="mt-2 text-muted-foreground">
-            Manage your created tasks. Duplicate a task to revise it, or delete open tasks you no
-            longer need.
+            {t(
+              "Manage your created tasks. Duplicate a task to revise it, or delete open tasks you no longer need.",
+            )}
           </p>
         </div>
         <Button asChild>
           <Link href="/app/tasks/new">
             <Plus />
-            Create task
+            {t("Create task")}
           </Link>
         </Button>
       </div>
       {error ? <ErrorState message={error} /> : null}
       {isLoading ? (
-        <LoadingState label="Loading your tasks" />
+        <LoadingState label={t("Loading your tasks")} />
       ) : tasks.length ? (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {tasks.map((task) => (
@@ -171,7 +175,10 @@ export function MyTasksPage() {
           ))}
         </div>
       ) : (
-        <EmptyState title="You have not created tasks yet" body="Create one when you need help." />
+        <EmptyState
+          title={t("You have not created tasks yet")}
+          body={t("Create one when you need help.")}
+        />
       )}
     </div>
   );

@@ -3,6 +3,7 @@
 import { ReactNode, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { t } from "@kometa/i18n";
 import {
   ClipboardList,
   Compass,
@@ -67,7 +68,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   }
 
   if (!hasHydrated || !isAuthenticated) {
-    return <LoadingState label="Checking session" />;
+    return <LoadingState label={t("Checking session")} />;
   }
 
   function isActive(href: string) {
@@ -82,7 +83,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <aside className="sticky top-0 hidden h-screen border-r bg-background/95 lg:flex lg:flex-col">
         <div className="flex h-16 items-center border-b px-5">
           <Link href="/app/tasks" className="font-heading text-xl font-semibold">
-            Kometa
+            {t("Kometa")}
           </Link>
         </div>
         <nav className="flex flex-1 flex-col gap-1 p-3">
@@ -95,7 +96,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             >
               <Link href={item.href}>
                 <item.icon />
-                {item.label}
+                {t(item.label)}
               </Link>
             </Button>
           ))}
@@ -107,7 +108,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
           <Button variant="outline" className="w-full justify-start" onClick={logout}>
             <LogOut />
-            Log out
+            {t("Log out")}
           </Button>
         </div>
       </aside>
@@ -116,7 +117,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <header className="sticky top-0 z-20 border-b bg-background/95 backdrop-blur lg:hidden">
           <div className="flex min-h-14 items-center justify-between gap-3 px-4">
             <Link href="/app/tasks" className="font-heading text-lg font-semibold">
-              Kometa
+              {t("Kometa")}
             </Link>
             <span className="max-w-44 truncate text-sm text-muted-foreground">{user?.name}</span>
           </div>
@@ -138,7 +139,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               >
                 <Link href={item.href}>
                   <item.icon />
-                  {item.label}
+                  {t(item.label)}
                 </Link>
               </Button>
             ))}
@@ -151,15 +152,15 @@ export function AppShell({ children }: { children: ReactNode }) {
                 )}
               >
                 <Menu />
-                Menu
+                {t("Menu")}
               </Button>
             </SheetTrigger>
           </nav>
 
           <SheetContent side="bottom" className="rounded-t-lg pb-8">
             <SheetHeader>
-              <SheetTitle>Menu</SheetTitle>
-              <SheetDescription>More places and account actions.</SheetDescription>
+              <SheetTitle>{t("Menu")}</SheetTitle>
+              <SheetDescription>{t("More places and account actions.")}</SheetDescription>
             </SheetHeader>
             <div className="grid gap-2 px-4">
               <ThemeSwitch id="mobile-theme-switch" className="mb-1" />
@@ -172,14 +173,14 @@ export function AppShell({ children }: { children: ReactNode }) {
                   >
                     <Link href={item.href}>
                       <item.icon />
-                      {item.label}
+                      {t(item.label)}
                     </Link>
                   </Button>
                 </SheetClose>
               ))}
               <Button variant="outline" className="mt-2 h-11 justify-start" onClick={logout}>
                 <LogOut />
-                Log out
+                {t("Log out")}
               </Button>
             </div>
           </SheetContent>
@@ -208,12 +209,14 @@ function ThemeSwitch({ id, className }: { id: string; className?: string }) {
     >
       <Label htmlFor={id} className="min-w-0 gap-2">
         {isDark ? <Moon className="size-4" /> : <Sun className="size-4" />}
-        <span className="truncate">{isDark ? "Dark" : "Light"} theme</span>
+        <span className="truncate">
+          {isDark ? t("Dark") : t("Light")} {t("theme")}
+        </span>
       </Label>
       <Switch
         id={id}
         checked={isDark}
-        aria-label="Toggle dark theme"
+        aria-label={t("Toggle dark theme")}
         onCheckedChange={(checked) => setTheme(checked ? "dark" : "light")}
       />
     </div>

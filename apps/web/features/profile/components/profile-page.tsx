@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { Save, ShieldAlert, Star } from "lucide-react";
+import { t } from "@kometa/i18n";
 import { toUpdateCurrentUserRequest } from "@kometa/logic";
 import type { User } from "@kometa/logic";
 import { kometaApi } from "@/shared/api/client";
@@ -34,7 +35,9 @@ export function ProfilePage() {
         }
       } catch (caughtError) {
         if (isActive) {
-          setError(caughtError instanceof Error ? caughtError.message : "Profile failed to load.");
+          setError(
+            caughtError instanceof Error ? caughtError.message : t("Profile failed to load."),
+          );
         }
       } finally {
         if (isActive) {
@@ -69,55 +72,55 @@ export function ProfilePage() {
       setProfile(nextProfile);
       setUser(nextProfile);
     } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : "Profile update failed.");
+      setError(caughtError instanceof Error ? caughtError.message : t("Profile update failed."));
     } finally {
       setIsSubmitting(false);
     }
   }
 
   if (isLoading && !profile) {
-    return <LoadingState label="Loading profile" />;
+    return <LoadingState label={t("Loading profile")} />;
   }
 
   if (!profile) {
-    return <ErrorState message={error ?? "Profile is unavailable."} />;
+    return <ErrorState message={error ?? t("Profile is unavailable.")} />;
   }
 
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
       <section>
         <div className="mb-5">
-          <h1 className="font-heading text-3xl font-semibold">Profile</h1>
+          <h1 className="font-heading text-3xl font-semibold">{t("Profile")}</h1>
           <p className="mt-2 text-muted-foreground">
-            Keep your public profile accurate for task owners and responders.
+            {t("Keep your public profile accurate for task owners and responders.")}
           </p>
         </div>
         <Card className="rounded-lg">
           <CardHeader>
-            <CardTitle>Edit profile</CardTitle>
-            <CardDescription>Skills and interests are comma-separated.</CardDescription>
+            <CardTitle>{t("Edit profile")}</CardTitle>
+            <CardDescription>{t("Skills and interests are comma-separated.")}</CardDescription>
           </CardHeader>
           <CardContent>
             <form className="grid gap-4" onSubmit={onSubmit}>
               {error ? <ErrorState message={error} /> : null}
               <div className="grid gap-2">
-                <Label htmlFor="name">Name</Label>
+                <Label htmlFor="name">{t("Name")}</Label>
                 <Input id="name" name="name" defaultValue={profile.name} required />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="location">Location</Label>
+                <Label htmlFor="location">{t("Location")}</Label>
                 <Input id="location" name="location" defaultValue={profile.location} required />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="bio">Bio</Label>
+                <Label htmlFor="bio">{t("Bio")}</Label>
                 <Textarea id="bio" name="bio" rows={5} defaultValue={profile.bio} required />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="skills">Skills</Label>
+                <Label htmlFor="skills">{t("Skills")}</Label>
                 <Input id="skills" name="skills" defaultValue={profile.skills.join(", ")} />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="interests">Interests</Label>
+                <Label htmlFor="interests">{t("Interests")}</Label>
                 <Input
                   id="interests"
                   name="interests"
@@ -125,12 +128,12 @@ export function ProfilePage() {
                 />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="avatarUrl">Avatar URL</Label>
+                <Label htmlFor="avatarUrl">{t("Avatar URL")}</Label>
                 <Input id="avatarUrl" name="avatarUrl" defaultValue={profile.avatarUrl ?? ""} />
               </div>
               <Button type="submit" disabled={isSubmitting}>
                 <Save />
-                {isSubmitting ? "Saving" : "Save profile"}
+                {isSubmitting ? t("Saving") : t("Save profile")}
               </Button>
             </form>
           </CardContent>
@@ -138,18 +141,20 @@ export function ProfilePage() {
       </section>
       <aside className="grid h-fit gap-4 rounded-lg border p-5">
         <div>
-          <p className="text-sm text-muted-foreground">Public preview</p>
+          <p className="text-sm text-muted-foreground">{t("Public preview")}</p>
           <h2 className="mt-1 font-heading text-2xl font-semibold">{profile.name}</h2>
           <p className="text-sm text-muted-foreground">{profile.location}</p>
         </div>
         <p className="text-sm leading-6">{profile.bio}</p>
         <div className="flex items-center gap-2 text-sm">
           <Star className="size-4 text-primary" />
-          {profile.rating.toFixed(1)} rating
-          <span className="text-muted-foreground">({profile.completedTasks} completed)</span>
+          {profile.rating.toFixed(1)} {t("rating")}
+          <span className="text-muted-foreground">
+            ({profile.completedTasks} {t("completed")})
+          </span>
         </div>
-        <TagGroup label="Skills" items={profile.skills} />
-        <TagGroup label="Interests" items={profile.interests} />
+        <TagGroup label={t("Skills")} items={profile.skills} />
+        <TagGroup label={t("Interests")} items={profile.interests} />
       </aside>
     </div>
   );
@@ -178,7 +183,9 @@ export function PublicProfilePage({ userId }: { userId: string }) {
         }
       } catch (caughtError) {
         if (isActive) {
-          setError(caughtError instanceof Error ? caughtError.message : "Profile failed to load.");
+          setError(
+            caughtError instanceof Error ? caughtError.message : t("Profile failed to load."),
+          );
         }
       } finally {
         if (isActive) {
@@ -194,11 +201,11 @@ export function PublicProfilePage({ userId }: { userId: string }) {
   }, [userId]);
 
   if (isLoading) {
-    return <LoadingState label="Loading profile" />;
+    return <LoadingState label={t("Loading profile")} />;
   }
 
   if (!profile) {
-    return <ErrorState message={error ?? "Profile is unavailable."} />;
+    return <ErrorState message={error ?? t("Profile is unavailable.")} />;
   }
 
   return (
@@ -210,17 +217,17 @@ export function PublicProfilePage({ userId }: { userId: string }) {
         </div>
         <Card className="rounded-lg">
           <CardHeader>
-            <CardTitle>About</CardTitle>
+            <CardTitle>{t("About")}</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-4">
             <p className="leading-7">{profile.bio}</p>
-            <TagGroup label="Skills" items={profile.skills} />
-            <TagGroup label="Interests" items={profile.interests} />
+            <TagGroup label={t("Skills")} items={profile.skills} />
+            <TagGroup label={t("Interests")} items={profile.interests} />
           </CardContent>
         </Card>
         <Card className="rounded-lg">
           <CardHeader>
-            <CardTitle>Feedback</CardTitle>
+            <CardTitle>{t("Feedback")}</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-3">
             {feedback.length ? (
@@ -234,7 +241,7 @@ export function PublicProfilePage({ userId }: { userId: string }) {
                 </div>
               ))
             ) : (
-              <p className="text-sm text-muted-foreground">No feedback yet.</p>
+              <p className="text-sm text-muted-foreground">{t("No feedback yet.")}</p>
             )}
           </CardContent>
         </Card>
@@ -242,16 +249,18 @@ export function PublicProfilePage({ userId }: { userId: string }) {
       <aside className="grid h-fit gap-4 rounded-lg border p-5">
         <div className="flex items-center gap-2 text-sm">
           <Star className="size-4 text-primary" />
-          {profile.rating.toFixed(1)} rating
+          {profile.rating.toFixed(1)} {t("rating")}
         </div>
-        <p className="text-sm text-muted-foreground">{profile.completedTasks} completed tasks</p>
+        <p className="text-sm text-muted-foreground">
+          {profile.completedTasks} {t("completed tasks")}
+        </p>
         <Badge className="w-fit" variant="outline">
-          {profile.accountStatus}
+          {t(profile.accountStatus)}
         </Badge>
         <Button asChild variant="outline">
           <Link href={`/app/reports/new?reportedUserId=${profile.id}`}>
             <ShieldAlert />
-            Report user
+            {t("Report user")}
           </Link>
         </Button>
       </aside>
@@ -267,7 +276,7 @@ function TagGroup({ label, items }: { label: string; items: string[] }) {
         {items.length ? (
           items.map((item) => <Badge key={item}>{item}</Badge>)
         ) : (
-          <Badge>None yet</Badge>
+          <Badge>{t("None yet")}</Badge>
         )}
       </div>
     </div>

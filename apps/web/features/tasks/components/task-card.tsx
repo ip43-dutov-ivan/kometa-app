@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { t } from "@kometa/i18n";
 import type { Task } from "@kometa/logic";
 import { getTaskCategoryLabel, getTaskLocationLabel } from "@kometa/logic";
 import { Badge } from "@/components/ui/badge";
@@ -11,7 +12,7 @@ export function TaskCard({ task, href }: { task: Task; href?: string }) {
       <CardHeader>
         <div className="flex flex-wrap items-center gap-2">
           <Badge variant="secondary">{getTaskCategoryLabel(task.category)}</Badge>
-          <Badge variant="outline">{task.status}</Badge>
+          <Badge variant="outline">{t(task.status)}</Badge>
         </div>
         <CardTitle className="text-xl leading-tight">{task.title}</CardTitle>
       </CardHeader>
@@ -26,7 +27,7 @@ export function TaskCard({ task, href }: { task: Task; href?: string }) {
       </CardContent>
       <CardFooter>
         <Button asChild variant="outline" className="w-full">
-          <Link href={href ?? `/app/tasks/${task.id}`}>Open task</Link>
+          <Link href={href ?? `/app/tasks/${task.id}`}>{t("Open task")}</Link>
         </Button>
       </CardFooter>
     </Card>
