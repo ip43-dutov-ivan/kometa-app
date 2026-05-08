@@ -4,11 +4,14 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { MessageSquare } from "lucide-react";
 import { t } from "@kometa/i18n";
-import type { Conversation, Task } from "@kometa/logic";
+import { chatRealtimeStore, type Conversation, type Task } from "@kometa/logic";
+import { useStore } from "zustand";
 import { kometaApi } from "@/shared/api/client";
 import { EmptyState, ErrorState, LoadingState } from "@/shared/components/page-state";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 
 interface ConversationItem {
   conversation: Conversation;
@@ -19,6 +22,10 @@ export function ConversationListPage() {
   const [items, setItems] = useState<ConversationItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const unreadCountsByConversationId = useStore(
+    chatRealtimeStore,
+    (state) => state.unreadCountsByConversationId,
+  );
 
   useEffect(() => {
     let isActive = true;
@@ -67,24 +74,46 @@ export function ConversationListPage() {
         <LoadingState label={t("Loading conversations")} />
       ) : items.length ? (
         <div className="grid gap-4 md:grid-cols-2">
-          {items.map(({ conversation, task }) => (
-            <Card key={conversation.id} className="rounded-lg">
-              <CardHeader>
-                <CardTitle className="text-xl">{task?.title ?? conversation.taskId}</CardTitle>
-              </CardHeader>
-              <CardContent className="text-sm text-muted-foreground">
-                {t("Last message")} {new Date(conversation.lastMessageAt).toLocaleString()}
-              </CardContent>
-              <CardFooter>
-                <Button asChild className="w-full">
-                  <Link href={`/app/conversations/${conversation.id}`}>
-                    <MessageSquare />
-                    {t("Open chat")}
-                  </Link>
-                </Button>
-              </CardFooter>
-            </Card>
-          ))}
+          {items.map(({ conversation, task }) => {
+            const unreadCount =
+              unreadCountsByConversationId[conversation.id] ?? conversation.unreadCount;
+            const hasUnreadMessages = unreadCount > 0;
+
+            return (
+              <Card
+                key={conversation.id}
+                className={cn("rounded-lg", hasUnreadMessages && "border-primary/50 bg-primary/5")}
+              >
+                <CardHeader className="flex-row items-start justify-between gap-3 space-y-0">
+                  <CardTitle className="min-w-0 text-xl">
+                    <span className={cn("block truncate", hasUnreadMessages && "font-semibold")}>
+                      {task?.title ?? conversation.taskId}
+                    </span>
+                  </CardTitle>
+                  {hasUnreadMessages ? (
+                    <Badge className="shrink-0">
+                      {unreadCount === 1 ? t("1 new") : `${unreadCount} ${t("new")}`}
+                    </Badge>
+                  ) : null}
+                </CardHeader>
+                <CardContent className="text-sm text-muted-foreground">
+                  {t("Last message")} {new Date(conversation.lastMessageAt).toLocaleString()}
+                </CardContent>
+                <CardFooter>
+                  <Button
+                    asChild
+                    className="w-full"
+                    variant={hasUnreadMessages ? "default" : "outline"}
+                  >
+                    <Link href={`/app/conversations/${conversation.id}`}>
+                      <MessageSquare />
+                      {hasUnreadMessages ? t("Read new messages") : t("Open chat")}
+                    </Link>
+                  </Button>
+                </CardFooter>
+              </Card>
+            );
+          })}
         </div>
       ) : (
         <EmptyState

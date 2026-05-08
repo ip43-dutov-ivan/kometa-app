@@ -117,6 +117,13 @@ export interface Conversation {
   taskId: TaskId;
   participantIds: UserId[];
   lastMessageAt: string;
+  unreadCount: number;
+  readStates: ConversationReadState[];
+}
+
+export interface ConversationReadState {
+  userId: UserId;
+  lastReadAt: string;
 }
 
 export interface Message {
@@ -208,6 +215,16 @@ export interface SendMessageRequest {
   body: string;
 }
 
+export interface ChatUnreadSummary {
+  totalUnreadCount: number;
+  unreadCountsByConversationId: Record<ConversationId, number>;
+}
+
+export interface MarkConversationReadResponse {
+  conversationId: ConversationId;
+  unreadCount: number;
+}
+
 export interface LeaveFeedbackRequest {
   rating: number;
   comment: string;
@@ -287,9 +304,9 @@ export interface ListMessagesQuery {
 }
 
 export interface ChatClientEvent {
-  type: "message.create";
-  body: string;
-  clientMessageId: string;
+  type: "message.create" | "conversation.read";
+  body?: string;
+  clientMessageId?: string;
 }
 
 export interface ChatMessageCreatedEvent {
@@ -300,9 +317,17 @@ export interface ChatMessageCreatedEvent {
   clientMessageId?: string;
 }
 
+export interface ConversationReadEvent {
+  type: "conversation.read";
+  conversationId: ConversationId;
+  userId: UserId;
+  lastReadAt: string;
+}
+
 export type ChatServerEvent =
   | { type: "message.created"; message: Message; clientMessageId?: string }
   | ChatMessageCreatedEvent
+  | ConversationReadEvent
   | { type: "error"; code: string; message: string };
 
 export interface ListReportsQuery extends PaginationQuery {

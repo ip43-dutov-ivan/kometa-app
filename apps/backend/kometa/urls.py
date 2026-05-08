@@ -26,6 +26,13 @@ urlpatterns = [
     path('auth/refresh', refresh, name='refresh'),
     path('auth/logout', logout, name='logout'),
 
+    path('me/chat-summary', ConversationViewSet.as_view({
+        'get': 'unread_summary'
+    }), name='chat-unread-summary'),
+    path('conversations/<str:pk>/read', ConversationViewSet.as_view({
+        'post': 'read'
+    }), name='conversation-read'),
+
     # Users & Tasks
     path('', include(router.urls)),
     

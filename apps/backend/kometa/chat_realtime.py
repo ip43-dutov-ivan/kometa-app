@@ -5,7 +5,7 @@ from django.utils import timezone
 from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from rest_framework_simplejwt.tokens import UntypedToken
 
-from .models import ConversationMessage
+from .models import ConversationMessage, ConversationReadState
 from .serializers import ConversationMessageSerializer
 
 User = get_user_model()
@@ -36,6 +36,16 @@ def create_conversation_message(conversation, sender, body):
 
 def serialize_chat_message(message):
     return dict(ConversationMessageSerializer(message).data)
+
+
+def mark_conversation_read(conversation, user):
+    read_at = timezone.now()
+    ConversationReadState.objects.update_or_create(
+        conversation=conversation,
+        user=user,
+        defaults={'last_read_at': read_at},
+    )
+    return read_at
 
 
 async def publish_chat_message(conversation, message_data, client_message_id=''):
@@ -74,3 +84,23 @@ async def publish_chat_message(conversation, message_data, client_message_id='')
 
 def publish_chat_message_sync(conversation, message_data, client_message_id=''):
     async_to_sync(publish_chat_message)(conversation, message_data, client_message_id)
+
+
+async def publish_conversation_read(conversation, user_id, last_read_at):
+    channel_layer = get_channel_layer()
+    if channel_layer is None:
+        return
+
+    await channel_layer.group_send(
+        f'conversation_{conversation.id}',
+        {
+            'type': 'conversation.read',
+            'conversationId': str(conversation.id),
+            'userId': str(user_id),
+            'lastReadAt': last_read_at.isoformat().replace('+00:00', 'Z'),
+        },
+    )
+
+
+def publish_conversation_read_sync(conversation, user_id, last_read_at):
+    async_to_sync(publish_conversation_read)(conversation, user_id, last_read_at)

@@ -116,6 +116,13 @@ export interface Conversation {
   taskId: TaskId;
   participantIds: UserId[];
   lastMessageAt: string;
+  unreadCount: number;
+  readStates: ConversationReadState[];
+}
+
+export interface ConversationReadState {
+  userId: UserId;
+  lastReadAt: string;
 }
 
 export interface ChatMessage {

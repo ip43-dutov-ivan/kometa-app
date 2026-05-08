@@ -5,7 +5,7 @@ from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 from django.contrib.auth import authenticate
 from django.core.exceptions import ValidationError as DjangoValidationError
-from .models import CompletionRequest, Conversation, ConversationMessage, Feedback, Match, Report, Task, TaskResponse, User
+from .models import CompletionRequest, Conversation, ConversationMessage, ConversationReadState, Feedback, Match, Report, Task, TaskResponse, User
 
 class UserSerializer(serializers.ModelSerializer):
     id = serializers.CharField(read_only=True)
@@ -246,14 +246,50 @@ class CompletionRequestSerializer(serializers.ModelSerializer):
 
 class ConversationSerializer(serializers.ModelSerializer):
     taskId = serializers.CharField(source='task_id', read_only=True)
-    participantIds = serializers.ListField(source='participant_ids', child=serializers.IntegerField(), read_only=True)
+    participantIds = serializers.SerializerMethodField()
     lastMessageAt = serializers.DateTimeField(source='last_message_at', read_only=True)
     createdAt = serializers.DateTimeField(source='created_at', read_only=True)
+    unreadCount = serializers.SerializerMethodField()
+    readStates = serializers.SerializerMethodField()
 
     class Meta:
         model = Conversation
-        fields = ['id', 'taskId', 'participantIds', 'lastMessageAt', 'createdAt']
-        read_only_fields = ['id', 'taskId', 'participantIds', 'lastMessageAt', 'createdAt']
+        fields = ['id', 'taskId', 'participantIds', 'lastMessageAt', 'createdAt', 'unreadCount', 'readStates']
+        read_only_fields = ['id', 'taskId', 'participantIds', 'lastMessageAt', 'createdAt', 'unreadCount', 'readStates']
+
+    def get_unreadCount(self, instance):
+        request = self.context.get('request')
+        if not request or not request.user or not request.user.is_authenticated:
+            return 0
+
+        queryset = instance.messages.exclude(sender_id=request.user.id)
+        read_state = ConversationReadState.objects.filter(
+            conversation=instance,
+            user=request.user,
+        ).first()
+        if read_state:
+            queryset = queryset.filter(created_at__gt=read_state.last_read_at)
+
+        return queryset.count()
+
+    def get_participantIds(self, instance):
+        return [str(participant_id) for participant_id in instance.participant_ids]
+
+    def get_readStates(self, instance):
+        request = self.context.get('request')
+        if not request or not request.user or not request.user.is_authenticated:
+            return []
+        if request.user.id not in instance.participant_ids:
+            return []
+
+        return [
+            {
+                'userId': str(read_state.user_id),
+                'lastReadAt': serializers.DateTimeField().to_representation(read_state.last_read_at),
+            }
+            for read_state in instance.read_states.all()
+            if read_state.user_id in instance.participant_ids
+        ]
 
 
 class ConversationMessageSerializer(serializers.ModelSerializer):

@@ -2,9 +2,10 @@
 
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowDown, Send, ShieldAlert } from "lucide-react";
+import { ArrowDown, Check, CheckCheck, Send, ShieldAlert } from "lucide-react";
 import { t } from "@kometa/i18n";
 import {
+  type ChatMessage,
   chatRealtimeStore,
   selectConversationMessages,
   type ChatServerEvent,
@@ -18,6 +19,7 @@ import { useKometaSession } from "@/shared/session/use-kometa-session";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 import { useConversationSocket } from "../hooks/use-conversation-socket";
 
 export function ChatPage({ conversationId }: { conversationId: string }) {
@@ -34,6 +36,10 @@ export function ChatPage({ conversationId }: { conversationId: string }) {
   const [showNewMessages, setShowNewMessages] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const readSyncRef = useRef(false);
+  const readSyncInFlightRef = useRef(false);
+  const readSyncVersionRef = useRef(0);
+  const sendReadRef = useRef<(() => boolean) | null>(null);
 
   // ── helpers ──────────────────────────────────────────────────────────────
 
@@ -43,20 +49,48 @@ export function ChatPage({ conversationId }: { conversationId: string }) {
     return el.scrollHeight - el.scrollTop - el.clientHeight < 100;
   };
 
+  const markConversationRead = useCallback(() => {
+    chatRealtimeStore.getState().markConversationRead(conversationId);
+    if (readSyncRef.current || readSyncInFlightRef.current) return;
+
+    if (sendReadRef.current?.()) {
+      readSyncRef.current = true;
+      return;
+    }
+
+    readSyncInFlightRef.current = true;
+    const syncVersion = readSyncVersionRef.current;
+    void kometaApi.conversations
+      .markRead(conversationId)
+      .then(() => {
+        if (readSyncVersionRef.current === syncVersion) {
+          readSyncRef.current = true;
+        }
+      })
+      .catch(() => {
+        readSyncRef.current = false;
+      })
+      .finally(() => {
+        readSyncInFlightRef.current = false;
+      });
+  }, [conversationId]);
+
   const scrollToBottom = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return;
     el.scrollTop = el.scrollHeight;
-    chatRealtimeStore.getState().markConversationRead(conversationId);
+    markConversationRead();
     setShowNewMessages(false);
-  }, [conversationId]);
+  }, [markConversationRead]);
 
   // ── initial load ──────────────────────────────────────────────────────────
 
   useEffect(() => {
     let cancelled = false;
+    readSyncRef.current = false;
+    readSyncVersionRef.current += 1;
     chatRealtimeStore.getState().setActiveConversationId(conversationId);
-    chatRealtimeStore.getState().markConversationRead(conversationId);
+    markConversationRead();
 
     async function load() {
       setLoadError(null);
@@ -73,7 +107,7 @@ export function ChatPage({ conversationId }: { conversationId: string }) {
         chatRealtimeStore
           .getState()
           .initializeConversationMessages(conversationId, messagesResponse.items);
-        chatRealtimeStore.getState().markConversationRead(conversationId);
+        markConversationRead();
         setHasMore(messagesResponse.pageInfo.hasMore);
       } catch (err) {
         if (!cancelled) {
@@ -91,7 +125,7 @@ export function ChatPage({ conversationId }: { conversationId: string }) {
         chatRealtimeStore.getState().setActiveConversationId(null);
       }
     };
-  }, [conversationId]);
+  }, [conversationId, markConversationRead]);
 
   // scroll to bottom once initial messages are ready
   useEffect(() => {
@@ -139,9 +173,9 @@ export function ChatPage({ conversationId }: { conversationId: string }) {
     }
     if (isNearBottom()) {
       setShowNewMessages(false);
-      chatRealtimeStore.getState().markConversationRead(conversationId);
+      markConversationRead();
     }
-  }, [conversationId, hasMore, isLoadingMore, loadMore]);
+  }, [hasMore, isLoadingMore, loadMore, markConversationRead]);
 
   // ── WebSocket ─────────────────────────────────────────────────────────────
 
@@ -153,14 +187,26 @@ export function ChatPage({ conversationId }: { conversationId: string }) {
         return;
       }
 
+      if (event.type === "conversation.read") {
+        setConversation((currentConversation) =>
+          currentConversation && currentConversation.id === event.conversationId
+            ? applyConversationReadEvent(currentConversation, event.userId, event.lastReadAt)
+            : currentConversation,
+        );
+        return;
+      }
+
       if (event.type !== "message.created") return;
 
       const { message, clientMessageId } = event;
 
       chatRealtimeStore.getState().applyConversationMessageCreated(message, clientMessageId);
+      if (message.senderId !== user?.id) {
+        readSyncRef.current = false;
+        readSyncVersionRef.current += 1;
+      }
 
       if (isNearBottom()) {
-        chatRealtimeStore.getState().markConversationRead(conversationId);
         requestAnimationFrame(scrollToBottom);
       } else if (message.senderId !== user?.id) {
         setShowNewMessages(true);
@@ -169,10 +215,15 @@ export function ChatPage({ conversationId }: { conversationId: string }) {
     [conversationId, user?.id, scrollToBottom],
   );
 
-  const { status: wsStatus, send: sendWsMessage } = useConversationSocket({
+  const {
+    status: wsStatus,
+    send: sendWsMessage,
+    sendRead,
+  } = useConversationSocket({
     conversationId,
     onEvent: handleWsEvent,
   });
+  sendReadRef.current = sendRead;
 
   // ── send ──────────────────────────────────────────────────────────────────
 
@@ -206,7 +257,6 @@ export function ChatPage({ conversationId }: { conversationId: string }) {
     }
 
     if (isNearBottom()) {
-      chatRealtimeStore.getState().markConversationRead(conversationId);
       requestAnimationFrame(scrollToBottom);
     }
   }
@@ -223,7 +273,10 @@ export function ChatPage({ conversationId }: { conversationId: string }) {
     );
   }
 
-  const otherUserId = conversation.participantIds.find((id) => id !== user?.id);
+  const otherUserId = conversation.participantIds.find((id) => String(id) !== user?.id);
+  const otherParticipantReadState = conversation.readStates.find(
+    (readState) => readState.userId === String(otherUserId),
+  );
 
   return (
     <div className="grid gap-5">
@@ -268,25 +321,41 @@ export function ChatPage({ conversationId }: { conversationId: string }) {
               onScroll={handleScroll}
             >
               {messages.length ? (
-                messages.map((message) => (
-                  <div
-                    key={message.clientMessageId ?? message.id}
-                    className={`max-w-[85%] rounded-lg border p-3 ${
-                      message.senderId === user?.id
-                        ? "ml-auto bg-primary text-primary-foreground"
-                        : "bg-muted"
-                    } ${message.status === "error" ? "border-destructive opacity-70" : ""}`}
-                  >
-                    <p className="text-sm leading-6">{message.body}</p>
-                    <p className="mt-1 text-xs opacity-75">
-                      {message.status === "sending"
-                        ? t("Sending…")
-                        : message.status === "error"
-                          ? t("Failed to send")
-                          : new Date(message.createdAt).toLocaleString()}
-                    </p>
-                  </div>
-                ))
+                messages.map((message) => {
+                  const isOwnMessage = message.senderId === user?.id;
+                  const isReadByOtherParticipant =
+                    isOwnMessage && isMessageReadByParticipant(message, otherParticipantReadState);
+
+                  return (
+                    <div
+                      key={message.clientMessageId ?? message.id}
+                      className={cn(
+                        "max-w-[85%] rounded-lg border p-3",
+                        isOwnMessage ? "ml-auto bg-primary text-primary-foreground" : "bg-muted",
+                        message.status === "error" && "border-destructive opacity-70",
+                      )}
+                    >
+                      <p className="text-sm leading-6">{message.body}</p>
+                      <div className="mt-1 flex items-center justify-end gap-1 text-xs opacity-75">
+                        <span>
+                          {message.status === "sending"
+                            ? t("Sending…")
+                            : message.status === "error"
+                              ? t("Failed to send")
+                              : new Date(message.createdAt).toLocaleString()}
+                        </span>
+                        {isOwnMessage && message.status === "sent" ? (
+                          <MessageReadIndicator
+                            aria-label={
+                              isReadByOtherParticipant ? t("Message read") : t("Message unread")
+                            }
+                            isRead={isReadByOtherParticipant}
+                          />
+                        ) : null}
+                      </div>
+                    </div>
+                  );
+                })
               ) : (
                 <EmptyState
                   title={t("No messages yet")}
@@ -318,4 +387,46 @@ export function ChatPage({ conversationId }: { conversationId: string }) {
       </form>
     </div>
   );
+}
+
+function MessageReadIndicator({
+  "aria-label": ariaLabel,
+  isRead,
+}: {
+  "aria-label": string;
+  isRead: boolean;
+}) {
+  const Icon = isRead ? CheckCheck : Check;
+  return (
+    <Icon
+      aria-label={ariaLabel}
+      className={cn("size-4 shrink-0", isRead ? "opacity-100" : "opacity-65")}
+      strokeWidth={isRead ? 3 : 2}
+    />
+  );
+}
+
+function applyConversationReadEvent(
+  conversation: Conversation,
+  userId: string,
+  lastReadAt: string,
+): Conversation {
+  const existingReadState = conversation.readStates.find(
+    (readState) => readState.userId === userId,
+  );
+  const readStates = existingReadState
+    ? conversation.readStates.map((readState) =>
+        readState.userId === userId ? { ...readState, lastReadAt } : readState,
+      )
+    : [...conversation.readStates, { userId, lastReadAt }];
+
+  return { ...conversation, readStates };
+}
+
+function isMessageReadByParticipant(
+  message: ChatMessage,
+  readState: Conversation["readStates"][number] | undefined,
+) {
+  if (!readState) return false;
+  return Date.parse(readState.lastReadAt) >= Date.parse(message.createdAt);
 }

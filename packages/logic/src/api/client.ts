@@ -2,6 +2,7 @@ import type {
   AuthSession,
   BlockUserRequest,
   BlockUserResponse,
+  ChatUnreadSummary,
   CompletionMutationResponse,
   CompletionRequest,
   CompletionRequestId,
@@ -23,6 +24,7 @@ import type {
   ListTasksQuery,
   LoginRequest,
   Match,
+  MarkConversationReadResponse,
   Message,
   RaiseCompletionConcernRequest,
   RegisterRequest,
@@ -176,6 +178,11 @@ export interface KometaApiClient {
       query?: ListMessagesQuery,
       options?: KometaRequestOptions,
     ) => Promise<ListResponse<Message>>;
+    getUnreadSummary: (options?: KometaRequestOptions) => Promise<ChatUnreadSummary>;
+    markRead: (
+      conversationId: ConversationId,
+      options?: KometaRequestOptions,
+    ) => Promise<MarkConversationReadResponse>;
     sendMessage: (
       conversationId: ConversationId,
       body: SendMessageRequest,
@@ -354,6 +361,13 @@ export function createKometaApiClient(options: KometaApiClientOptions = {}): Kom
         get<ListResponse<Message>>(
           `/conversations/${segment(conversationId)}/messages`,
           query,
+          options,
+        ),
+      getUnreadSummary: (options) => get<ChatUnreadSummary>("/me/chat-summary", undefined, options),
+      markRead: (conversationId, options) =>
+        post<MarkConversationReadResponse>(
+          `/conversations/${segment(conversationId)}/read`,
+          undefined,
           options,
         ),
       sendMessage: (conversationId, body, options) =>

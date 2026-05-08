@@ -85,6 +85,8 @@ export const matchHandlers = [
       taskId: task.id,
       participantIds: [task.ownerId, response.providerId],
       lastMessageAt: now(),
+      unreadCount: 0,
+      readStates: [],
     };
 
     const match: Match = {

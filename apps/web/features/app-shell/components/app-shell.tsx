@@ -83,6 +83,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!hasHydrated || !isAuthenticated) {
+      chatRealtimeStore.getState().setUnreadCounts({});
       setPendingOwnerResponseCount(0);
       return;
     }
@@ -116,6 +117,31 @@ export function AppShell({ children }: { children: ReactNode }) {
     }
 
     loadPendingOwnerResponses();
+
+    return () => {
+      isActive = false;
+    };
+  }, [hasHydrated, isAuthenticated, pathname]);
+
+  useEffect(() => {
+    if (!hasHydrated || !isAuthenticated) {
+      return;
+    }
+
+    let isActive = true;
+
+    async function loadChatUnreadSummary() {
+      try {
+        const summary = await kometaApi.conversations.getUnreadSummary();
+        if (isActive) {
+          chatRealtimeStore.getState().setUnreadCounts(summary.unreadCountsByConversationId);
+        }
+      } catch {
+        // Keep realtime-derived counts if the baseline refresh fails.
+      }
+    }
+
+    loadChatUnreadSummary();
 
     return () => {
       isActive = false;

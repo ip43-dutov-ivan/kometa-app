@@ -96,5 +96,13 @@ export function useConversationSocket({ conversationId, onEvent }: Options) {
     return true;
   }, []);
 
-  return { status, send };
+  const sendRead = useCallback((): boolean => {
+    const ws = wsRef.current;
+    if (!ws || ws.readyState !== WebSocket.OPEN) return false;
+    const event: ChatClientEvent = { type: "conversation.read" };
+    ws.send(JSON.stringify(event));
+    return true;
+  }, []);
+
+  return { status, send, sendRead };
 }

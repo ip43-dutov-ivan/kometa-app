@@ -125,6 +125,7 @@ export interface ChatRealtimeActions {
   markMessageFailed: (conversationId: ConversationId, clientMessageId: string) => void;
   markSendingMessagesFailed: (conversationId: ConversationId) => void;
   markConversationRead: (conversationId: ConversationId) => void;
+  setUnreadCounts: (unreadCountsByConversationId: Record<string, number>) => void;
   setActiveConversationId: (conversationId: ConversationId | null) => void;
   setInboxConnectionStatus: (status: ChatConnectionStatus) => void;
 }
@@ -253,6 +254,8 @@ export const chatRealtimeStore = createStore<ChatRealtimeStore>()((set) => ({
         [conversationId]: 0,
       },
     })),
+
+  setUnreadCounts: (unreadCountsByConversationId) => set({ unreadCountsByConversationId }),
 
   setActiveConversationId: (conversationId) => set({ activeConversationId: conversationId }),
   setInboxConnectionStatus: (status) => set({ inboxConnectionStatus: status }),

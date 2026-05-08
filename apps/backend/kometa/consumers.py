@@ -9,6 +9,8 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from .chat_realtime import (
     authenticate_token,
     create_conversation_message,
+    mark_conversation_read,
+    publish_conversation_read,
     publish_chat_message,
     serialize_chat_message,
 )
@@ -49,7 +51,13 @@ class ConversationConsumer(AsyncWebsocketConsumer):
             await self._send_error('invalid_json', 'Invalid JSON.')
             return
 
-        if data.get('type') != 'message.create':
+        event_type = data.get('type')
+        if event_type == 'conversation.read':
+            last_read_at = await self._mark_read()
+            await publish_conversation_read(self.conversation, self.user.id, last_read_at)
+            return
+
+        if event_type != 'message.create':
             await self._send_error('unknown_type', 'Unknown message type.')
             return
 
@@ -67,6 +75,14 @@ class ConversationConsumer(AsyncWebsocketConsumer):
             'type': 'message.created',
             'message': event['message'],
             'clientMessageId': event.get('clientMessageId', ''),
+        }))
+
+    async def conversation_read(self, event):
+        await self.send(json.dumps({
+            'type': 'conversation.read',
+            'conversationId': event['conversationId'],
+            'userId': event['userId'],
+            'lastReadAt': event['lastReadAt'],
         }))
 
     async def _send_error(self, code, message):
@@ -90,6 +106,10 @@ class ConversationConsumer(AsyncWebsocketConsumer):
     def _persist_and_serialize(self, body):
         msg = create_conversation_message(self.conversation, self.user, body)
         return serialize_chat_message(msg)
+
+    @database_sync_to_async
+    def _mark_read(self):
+        return mark_conversation_read(self.conversation, self.user)
 
 
 class UserInboxConsumer(AsyncWebsocketConsumer):

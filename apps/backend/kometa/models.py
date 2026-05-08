@@ -181,6 +181,27 @@ class ConversationMessage(models.Model):
         return f'Message from {self.sender_id} in {self.conversation_id}'
 
 
+class ConversationReadState(models.Model):
+    conversation = models.ForeignKey(
+        Conversation,
+        related_name='read_states',
+        on_delete=models.CASCADE,
+    )
+    user = models.ForeignKey(
+        User,
+        related_name='conversation_read_states',
+        on_delete=models.CASCADE,
+    )
+    last_read_at = models.DateTimeField()
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = [('conversation', 'user')]
+
+    def __str__(self):
+        return f'Read state for user {self.user_id} in conversation {self.conversation_id}'
+
+
 class Match(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     task = models.ForeignKey(

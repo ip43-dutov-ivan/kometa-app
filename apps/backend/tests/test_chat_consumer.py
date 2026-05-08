@@ -6,7 +6,7 @@ from channels.testing import WebsocketCommunicator
 from rest_framework import status
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from kometa.models import Conversation, ConversationMessage
+from kometa.models import Conversation, ConversationMessage, ConversationReadState
 
 from .factories import create_task, create_user
 from .helpers import auth_client
@@ -164,6 +164,31 @@ class ConversationConsumerTests(IsolatedAsyncioTestCase):
 
         await owner_comm.disconnect()
         await provider_inbox.disconnect()
+
+    async def test_read_event_persisted_and_broadcast_to_conversation(self):
+        owner_comm, owner_ok = await self._connect(self.owner)
+        provider_comm, provider_ok = await self._connect(self.provider)
+        self.assertTrue(owner_ok)
+        self.assertTrue(provider_ok)
+
+        await provider_comm.send_json_to({'type': 'conversation.read'})
+
+        owner_event = await owner_comm.receive_json_from()
+        self.assertEqual(owner_event['type'], 'conversation.read')
+        self.assertEqual(owner_event['conversationId'], str(self.conversation.id))
+        self.assertEqual(owner_event['userId'], str(self.provider.id))
+        self.assertTrue(owner_event['lastReadAt'])
+
+        read_state_exists = await database_sync_to_async(
+            lambda: ConversationReadState.objects.filter(
+                conversation=self.conversation,
+                user=self.provider,
+            ).exists()
+        )()
+        self.assertTrue(read_state_exists)
+
+        await owner_comm.disconnect()
+        await provider_comm.disconnect()
 
     async def test_sender_inbox_does_not_receive_own_message(self):
         owner_comm, owner_ok = await self._connect(self.owner)
