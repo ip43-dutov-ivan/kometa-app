@@ -4,14 +4,14 @@ import { useEffect, useRef } from "react";
 import { t } from "@kometa/i18n";
 import { getTaskLocationCenter, type Coordinates, type TaskLocation } from "@kometa/logic";
 import mapboxgl from "mapbox-gl";
-import type { MapboxTheme } from "../lib/mapbox-geocoder-theme";
+import type { MapboxTheme } from "@/shared/lib/mapbox-geocoder-theme";
 
 const MAPBOX_STYLES = {
   light: "mapbox://styles/mapbox/light-v11",
   dark: "mapbox://styles/mapbox/dark-v11",
 } as const;
 
-interface TaskLocationMapProps {
+interface LocationMapProps {
   accessToken: string;
   disabled: boolean;
   fallbackCenter: Coordinates;
@@ -21,7 +21,7 @@ interface TaskLocationMapProps {
   onPinnedLocationChange: (latitude: number, longitude: number) => void;
 }
 
-export function TaskLocationMap({
+export function LocationMap({
   accessToken,
   disabled,
   fallbackCenter,
@@ -29,7 +29,7 @@ export function TaskLocationMap({
   mapTheme,
   value,
   onPinnedLocationChange,
-}: TaskLocationMapProps) {
+}: LocationMapProps) {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const markerRef = useRef<mapboxgl.Marker | null>(null);
@@ -128,7 +128,7 @@ export function TaskLocationMap({
       <div
         ref={mapContainerRef}
         className="h-64 min-w-0 max-w-full overflow-hidden rounded-lg border bg-muted"
-        aria-label={t("Task location map")}
+        aria-label={t("Location map")}
       />
     </div>
   );

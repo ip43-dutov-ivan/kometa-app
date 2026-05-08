@@ -1,5 +1,8 @@
 import logging
+import os
+import uuid
 
+from django.conf import settings
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.decorators import action
@@ -29,6 +32,36 @@ class UserViewSet(ModelViewSet):
             logger.info('User profile updated user_id=%s', request.user.id)
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=False, methods=['post'], url_path='upload-avatar')
+    def upload_avatar(self, request):
+        file = request.FILES.get('file')
+        if not file:
+            return Response({'detail': 'No file provided.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not file.content_type.startswith('image/'):
+            return Response({'detail': 'File must be an image.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if file.size > 5 * 1024 * 1024:
+            return Response({'detail': 'File size must not exceed 5 MB.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        ext = os.path.splitext(file.name)[1].lower() or '.jpg'
+        filename = f'{uuid.uuid4()}{ext}'
+        avatar_dir = os.path.join(settings.MEDIA_ROOT, 'avatars')
+        os.makedirs(avatar_dir, exist_ok=True)
+
+        file_path = os.path.join(avatar_dir, filename)
+        with open(file_path, 'wb+') as dest:
+            for chunk in file.chunks():
+                dest.write(chunk)
+
+        avatar_url = request.build_absolute_uri(f'{settings.MEDIA_URL}avatars/{filename}')
+        request.user.avatar_url = avatar_url
+        request.user.save(update_fields=['avatar_url'])
+        logger.info('Avatar uploaded user_id=%s', request.user.id)
+
+        serializer = UserSerializer(request.user)
+        return Response(serializer.data)
 
     def list(self, request, *args, **kwargs):
         return Response(status=status.HTTP_405_METHOD_NOT_ALLOWED)

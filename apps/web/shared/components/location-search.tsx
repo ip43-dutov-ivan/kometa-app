@@ -14,7 +14,7 @@ import { Input } from "@/components/ui/input";
 type GeocoderComponentProps = ComponentProps<typeof Geocoder>;
 type GeocoderFeature = Parameters<NonNullable<GeocoderComponentProps["onRetrieve"]>>[0];
 
-interface TaskLocationSearchProps {
+interface LocationSearchProps {
   accessToken: string;
   disabled: boolean;
   geocoderTheme: GeocoderComponentProps["theme"];
@@ -26,7 +26,7 @@ interface TaskLocationSearchProps {
   onChange: (location: TaskLocation) => void;
 }
 
-export function TaskLocationSearch({
+export function LocationSearch({
   accessToken,
   disabled,
   geocoderTheme,
@@ -36,7 +36,7 @@ export function TaskLocationSearch({
   proximity,
   value,
   onChange,
-}: TaskLocationSearchProps) {
+}: LocationSearchProps) {
   if (accessToken) {
     return (
       <div className="min-w-0 max-w-full [&_mapbox-geocoder]:block [&_mapbox-geocoder]:max-w-full">

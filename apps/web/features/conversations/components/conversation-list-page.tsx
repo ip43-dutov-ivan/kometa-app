@@ -147,7 +147,7 @@ export function ConversationListPage() {
             title: task?.title ?? conversation.taskId,
             body: otherUser
               ? `${t("Matched with")} ${otherUser.name}`
-              : t("Task-scoped chat after a match."),
+              : t("Task-scoped chats available after a match."),
             updatedAt: conversation.lastMessageAt,
             href: `/app/conversations/${conversation.id}`,
             actionLabel: t("Open chat"),
@@ -309,7 +309,7 @@ function InboxCard({ item, unreadCount }: { item: InboxItem; unreadCount: number
     <Card className={cn("rounded-lg", hasUnreadMessages && "border-primary/50 bg-primary/5")}>
       <CardHeader className="space-y-3">
         <div className="flex flex-wrap gap-2">
-          {item.type === "chat" ? <Badge>{t("Match")}</Badge> : null}
+          {item.type === "chat" ? <Badge>{t("Matched")}</Badge> : null}
           {isMyResponse ? <Badge>{t("Response")}</Badge> : null}
           {isResponseReview ? <Badge>{t("Responses")}</Badge> : null}
           {item.type === "chat" && hasUnreadMessages ? (

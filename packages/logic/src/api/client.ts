@@ -96,6 +96,7 @@ export interface KometaApiClient {
   users: {
     getMe: (options?: KometaRequestOptions) => Promise<User>;
     updateMe: (body: UpdateCurrentUserRequest, options?: KometaRequestOptions) => Promise<User>;
+    uploadAvatar: (file: File, options?: KometaRequestOptions) => Promise<User>;
     getById: (userId: UserId, options?: KometaRequestOptions) => Promise<User>;
     listFeedback: (
       userId: UserId,
@@ -285,6 +286,46 @@ export function createKometaApiClient(options: KometaApiClientOptions = {}): Kom
   const del = <TResponse>(path: string, options?: KometaRequestOptions): Promise<TResponse> =>
     request<TResponse>(path, { method: "DELETE" }, options);
 
+  const postFormData = async <TResponse>(
+    path: string,
+    formData: FormData,
+    requestOptions: KometaRequestOptions = {},
+  ): Promise<TResponse> => {
+    const token =
+      requestOptions.accessToken ??
+      options.accessToken ??
+      (options.getAccessToken ? await options.getAccessToken() : undefined);
+
+    const makeHeaders = (t: string | null | undefined) => {
+      const h = new Headers(options.defaultHeaders);
+      h.set("Accept", "application/json");
+      if (t) h.set("Authorization", `Bearer ${t}`);
+      return h;
+    };
+
+    const doFetch = (t: string | null | undefined) =>
+      fetchImpl(`${baseUrl}${path}`, {
+        method: "POST",
+        body: formData,
+        headers: makeHeaders(t),
+        signal: requestOptions.signal,
+      });
+
+    const response = await doFetch(token);
+
+    if (response.status === 401 && options.refreshAccessToken) {
+      const refreshedToken = await options.refreshAccessToken();
+      if (refreshedToken && refreshedToken !== token) {
+        const retryResponse = await doFetch(refreshedToken);
+        if (retryResponse.ok) return (await retryResponse.json()) as TResponse;
+        throw new KometaApiError(retryResponse.status, await readError(retryResponse));
+      }
+    }
+
+    if (!response.ok) throw new KometaApiError(response.status, await readError(response));
+    return (await response.json()) as TResponse;
+  };
+
   return {
     auth: {
       register: (body, options) => post<AuthSession>("/auth/register", body, options),
@@ -295,6 +336,11 @@ export function createKometaApiClient(options: KometaApiClientOptions = {}): Kom
     users: {
       getMe: (options) => get<User>("/users/me", undefined, options),
       updateMe: (body, options) => patch<User>("/users/me", body, options),
+      uploadAvatar: (file, options) => {
+        const formData = new FormData();
+        formData.append("file", file);
+        return postFormData<User>("/users/upload-avatar", formData, options);
+      },
       getById: (userId, options) => get<User>(`/users/${segment(userId)}`, undefined, options),
       listFeedback: (userId, query, options) =>
         get<ListResponse<Feedback>>(`/users/${segment(userId)}/feedback`, query, options),

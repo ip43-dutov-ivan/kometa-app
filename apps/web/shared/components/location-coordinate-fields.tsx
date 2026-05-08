@@ -3,23 +3,23 @@ import type { TaskLocation } from "@kometa/logic";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-interface TaskLocationCoordinateFieldsProps {
+interface LocationCoordinateFieldsProps {
   value: TaskLocation;
   disabled: boolean;
   onChange: (location: TaskLocation) => void;
 }
 
-export function TaskLocationCoordinateFields({
+export function LocationCoordinateFields({
   value,
   disabled,
   onChange,
-}: TaskLocationCoordinateFieldsProps) {
+}: LocationCoordinateFieldsProps) {
   return (
     <div className="grid gap-3 sm:grid-cols-2">
       <div className="grid gap-2">
-        <Label htmlFor="task-location-latitude">{t("Latitude")}</Label>
+        <Label htmlFor="location-latitude">{t("Latitude")}</Label>
         <Input
-          id="task-location-latitude"
+          id="location-latitude"
           type="number"
           min="-90"
           max="90"
@@ -35,9 +35,9 @@ export function TaskLocationCoordinateFields({
         />
       </div>
       <div className="grid gap-2">
-        <Label htmlFor="task-location-longitude">{t("Longitude")}</Label>
+        <Label htmlFor="location-longitude">{t("Longitude")}</Label>
         <Input
-          id="task-location-longitude"
+          id="location-longitude"
           type="number"
           min="-180"
           max="180"

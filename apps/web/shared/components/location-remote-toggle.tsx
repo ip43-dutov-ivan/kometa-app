@@ -2,22 +2,22 @@ import { t } from "@kometa/i18n";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 
-interface TaskLocationRemoteToggleProps {
+interface LocationRemoteToggleProps {
   checked: boolean;
   disabled: boolean;
   onCheckedChange: (checked: boolean) => void;
 }
 
-export function TaskLocationRemoteToggle({
+export function LocationRemoteToggle({
   checked,
   disabled,
   onCheckedChange,
-}: TaskLocationRemoteToggleProps) {
+}: LocationRemoteToggleProps) {
   return (
     <div className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2">
-      <Label htmlFor="task-location-remote">{t("Remote task")}</Label>
+      <Label htmlFor="location-remote">{t("Remote task")}</Label>
       <Switch
-        id="task-location-remote"
+        id="location-remote"
         checked={checked}
         onCheckedChange={onCheckedChange}
         disabled={disabled}
