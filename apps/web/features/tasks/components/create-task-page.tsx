@@ -5,7 +5,11 @@ import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 import { t } from "@kometa/i18n";
 import type { TaskLocation } from "@kometa/logic";
-import { normalizeTaskCategoryId, toCreateTaskRequest } from "@kometa/logic";
+import {
+  isTaskLocationComplete,
+  normalizeTaskCategoryId,
+  toCreateTaskRequest,
+} from "@kometa/logic";
 import { kometaApi } from "@/shared/api/client";
 import { ErrorState, LoadingState } from "@/shared/components/page-state";
 import { useKometaSession } from "@/shared/session/use-kometa-session";
@@ -198,19 +202,5 @@ export function CreateTaskPage({ duplicateFrom }: { duplicateFrom?: string }) {
         </CardContent>
       </Card>
     </div>
-  );
-}
-
-function isTaskLocationComplete(location: TaskLocation): boolean {
-  if (!location.label.trim()) {
-    return false;
-  }
-
-  return (
-    location.isRemote ||
-    (location.latitude !== undefined &&
-      location.longitude !== undefined &&
-      Number.isFinite(location.latitude) &&
-      Number.isFinite(location.longitude))
   );
 }
