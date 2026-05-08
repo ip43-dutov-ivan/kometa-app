@@ -1,12 +1,16 @@
 import logging
 from datetime import datetime
 
-from django.utils import timezone
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
+from ..chat_realtime import (
+    create_conversation_message,
+    publish_chat_message_sync,
+    serialize_chat_message,
+)
 from ..models import Conversation, ConversationMessage
 from ..serializers import ConversationSerializer, ConversationMessageSerializer
 
@@ -123,13 +127,9 @@ class ConversationMessageViewSet(ModelViewSet):
         if not isinstance(body, str) or not body.strip():
             return Response({'detail': 'Message body is required.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        message = ConversationMessage.objects.create(
-            conversation=conversation,
-            sender=request.user,
-            body=body.strip(),
-        )
-        conversation.last_message_at = timezone.now()
-        conversation.save(update_fields=['last_message_at'])
+        message = create_conversation_message(conversation, request.user, body.strip())
+        message_data = serialize_chat_message(message)
+        publish_chat_message_sync(conversation, message_data)
 
         logger.info(
             'Conversation message created conversation_id=%s message_id=%s sender_id=%s',
@@ -138,5 +138,4 @@ class ConversationMessageViewSet(ModelViewSet):
             request.user.id,
         )
 
-        serializer = self.get_serializer(message)
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(message_data, status=status.HTTP_201_CREATED)

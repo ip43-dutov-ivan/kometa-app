@@ -3,21 +3,14 @@ from unittest import IsolatedAsyncioTestCase
 
 from channels.db import database_sync_to_async
 from channels.testing import WebsocketCommunicator
-from django.test import override_settings
+from rest_framework import status
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from kometa.models import Conversation, ConversationMessage
 
 from .factories import create_task, create_user
+from .helpers import auth_client
 
-CHANNEL_LAYERS_INMEMORY = {
-    'default': {
-        'BACKEND': 'channels.layers.InMemoryChannelLayer',
-    }
-}
-
-
-@override_settings(CHANNEL_LAYERS=CHANNEL_LAYERS_INMEMORY)
 class ConversationConsumerTests(IsolatedAsyncioTestCase):
     databases = ('default',)
 
@@ -58,10 +51,20 @@ class ConversationConsumerTests(IsolatedAsyncioTestCase):
     def _url(self, token=''):
         return f'/ws/conversations/{self.conversation.id}/?token={token}'
 
+    def _inbox_url(self, token=''):
+        return f'/ws/me/?token={token}'
+
     async def _connect(self, user):
         from config.asgi import application
         token = await database_sync_to_async(self._token)(user)
         comm = WebsocketCommunicator(application, self._url(token))
+        connected, _ = await comm.connect()
+        return comm, connected
+
+    async def _connect_inbox(self, user):
+        from config.asgi import application
+        token = await database_sync_to_async(self._token)(user)
+        comm = WebsocketCommunicator(application, self._inbox_url(token))
         connected, _ = await comm.connect()
         return comm, connected
 
@@ -87,6 +90,25 @@ class ConversationConsumerTests(IsolatedAsyncioTestCase):
     async def test_participant_connects(self):
         comm, connected = await self._connect(self.owner)
         self.assertTrue(connected)
+        await comm.disconnect()
+
+    async def test_inbox_participant_connects(self):
+        comm, connected = await self._connect_inbox(self.owner)
+        self.assertTrue(connected)
+        await comm.disconnect()
+
+    async def test_inbox_unauthenticated_connect_rejected(self):
+        from config.asgi import application
+        comm = WebsocketCommunicator(application, self._inbox_url(''))
+        connected, _ = await comm.connect()
+        self.assertFalse(connected)
+        await comm.disconnect()
+
+    async def test_inbox_invalid_token_rejected(self):
+        from config.asgi import application
+        comm = WebsocketCommunicator(application, self._inbox_url('not.a.token'))
+        connected, _ = await comm.connect()
+        self.assertFalse(connected)
         await comm.disconnect()
 
     async def test_message_persisted_and_broadcast_to_both(self):
@@ -118,6 +140,88 @@ class ConversationConsumerTests(IsolatedAsyncioTestCase):
 
         await owner_comm.disconnect()
         await provider_comm.disconnect()
+
+    async def test_message_broadcast_to_recipient_inbox(self):
+        owner_comm, owner_ok = await self._connect(self.owner)
+        provider_inbox, provider_inbox_ok = await self._connect_inbox(self.provider)
+        self.assertTrue(owner_ok)
+        self.assertTrue(provider_inbox_ok)
+
+        await owner_comm.send_json_to({
+            'type': 'message.create',
+            'body': 'Inbox hello!',
+            'clientMessageId': 'cid-inbox-1',
+        })
+
+        await owner_comm.receive_json_from()
+        inbox_event = await provider_inbox.receive_json_from()
+
+        self.assertEqual(inbox_event['type'], 'chat.message.created')
+        self.assertEqual(inbox_event['message']['body'], 'Inbox hello!')
+        self.assertEqual(inbox_event['conversationId'], str(self.conversation.id))
+        self.assertEqual(inbox_event['taskId'], str(self.conversation.task_id))
+        self.assertEqual(inbox_event['clientMessageId'], 'cid-inbox-1')
+
+        await owner_comm.disconnect()
+        await provider_inbox.disconnect()
+
+    async def test_sender_inbox_does_not_receive_own_message(self):
+        owner_comm, owner_ok = await self._connect(self.owner)
+        owner_inbox, owner_inbox_ok = await self._connect_inbox(self.owner)
+        self.assertTrue(owner_ok)
+        self.assertTrue(owner_inbox_ok)
+
+        await owner_comm.send_json_to({
+            'type': 'message.create',
+            'body': 'No self inbox duplicate',
+            'clientMessageId': 'cid-inbox-2',
+        })
+
+        await owner_comm.receive_json_from()
+        self.assertTrue(await owner_inbox.receive_nothing(timeout=0.1))
+
+        await owner_comm.disconnect()
+        await owner_inbox.disconnect()
+
+    async def test_outsider_inbox_does_not_receive_conversation_message(self):
+        owner_comm, owner_ok = await self._connect(self.owner)
+        outsider_inbox, outsider_inbox_ok = await self._connect_inbox(self.outsider)
+        self.assertTrue(owner_ok)
+        self.assertTrue(outsider_inbox_ok)
+
+        await owner_comm.send_json_to({
+            'type': 'message.create',
+            'body': 'Participants only',
+            'clientMessageId': 'cid-inbox-3',
+        })
+
+        await owner_comm.receive_json_from()
+        self.assertTrue(await outsider_inbox.receive_nothing(timeout=0.1))
+
+        await owner_comm.disconnect()
+        await outsider_inbox.disconnect()
+
+    async def test_rest_message_broadcast_to_recipient_inbox(self):
+        provider_inbox, provider_inbox_ok = await self._connect_inbox(self.provider)
+        self.assertTrue(provider_inbox_ok)
+
+        def post_message():
+            client = auth_client(self.owner)
+            return client.post(
+                f'/api/v1/conversations/{self.conversation.id}/messages',
+                {'body': 'REST inbox hello!'},
+                format='json',
+            )
+
+        response = await database_sync_to_async(post_message)()
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        inbox_event = await provider_inbox.receive_json_from()
+        self.assertEqual(inbox_event['type'], 'chat.message.created')
+        self.assertEqual(inbox_event['message']['body'], 'REST inbox hello!')
+        self.assertEqual(inbox_event['conversationId'], str(self.conversation.id))
+
+        await provider_inbox.disconnect()
 
     async def test_empty_body_returns_error(self):
         comm, connected = await self._connect(self.owner)

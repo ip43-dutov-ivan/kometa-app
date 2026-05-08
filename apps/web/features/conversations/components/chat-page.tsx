@@ -5,18 +5,13 @@ import Link from "next/link";
 import { ArrowDown, Send, ShieldAlert } from "lucide-react";
 import { t } from "@kometa/i18n";
 import {
-  applyCreatedChatMessage,
-  createKnownMessageIds,
-  createOptimisticChatMessage,
-  markChatMessageFailed,
-  markSendingChatMessagesFailed,
-  prependOlderChatMessages,
-  toChronologicalChatMessages,
-  type ChatMessage,
+  chatRealtimeStore,
+  selectConversationMessages,
   type ChatServerEvent,
   type Conversation,
   type Task,
 } from "@kometa/logic";
+import { useStore } from "zustand";
 import { kometaApi } from "@/shared/api/client";
 import { EmptyState, ErrorState, LoadingState } from "@/shared/components/page-state";
 import { useKometaSession } from "@/shared/session/use-kometa-session";
@@ -30,7 +25,7 @@ export function ChatPage({ conversationId }: { conversationId: string }) {
 
   const [conversation, setConversation] = useState<Conversation | null>(null);
   const [task, setTask] = useState<Task | null>(null);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const messages = useStore(chatRealtimeStore, selectConversationMessages(conversationId));
   const [hasMore, setHasMore] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -39,7 +34,6 @@ export function ChatPage({ conversationId }: { conversationId: string }) {
   const [showNewMessages, setShowNewMessages] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
-  const knownIdsRef = useRef(new Set<string>());
 
   // ── helpers ──────────────────────────────────────────────────────────────
 
@@ -53,13 +47,16 @@ export function ChatPage({ conversationId }: { conversationId: string }) {
     const el = scrollRef.current;
     if (!el) return;
     el.scrollTop = el.scrollHeight;
+    chatRealtimeStore.getState().markConversationRead(conversationId);
     setShowNewMessages(false);
-  }, []);
+  }, [conversationId]);
 
   // ── initial load ──────────────────────────────────────────────────────────
 
   useEffect(() => {
     let cancelled = false;
+    chatRealtimeStore.getState().setActiveConversationId(conversationId);
+    chatRealtimeStore.getState().markConversationRead(conversationId);
 
     async function load() {
       setLoadError(null);
@@ -71,12 +68,12 @@ export function ChatPage({ conversationId }: { conversationId: string }) {
         ]);
         if (cancelled) return;
 
-        const nextMessages = toChronologicalChatMessages(messagesResponse.items);
-        knownIdsRef.current = createKnownMessageIds(nextMessages);
-
         setConversation(nextConversation);
         setTask(nextTask);
-        setMessages(nextMessages);
+        chatRealtimeStore
+          .getState()
+          .initializeConversationMessages(conversationId, messagesResponse.items);
+        chatRealtimeStore.getState().markConversationRead(conversationId);
         setHasMore(messagesResponse.pageInfo.hasMore);
       } catch (err) {
         if (!cancelled) {
@@ -90,6 +87,9 @@ export function ChatPage({ conversationId }: { conversationId: string }) {
     load();
     return () => {
       cancelled = true;
+      if (chatRealtimeStore.getState().activeConversationId === conversationId) {
+        chatRealtimeStore.getState().setActiveConversationId(null);
+      }
     };
   }, [conversationId]);
 
@@ -116,7 +116,7 @@ export function ChatPage({ conversationId }: { conversationId: string }) {
         before: oldestCreatedAt,
         limit: 50,
       });
-      setMessages((prev) => prependOlderChatMessages(prev, response.items, knownIdsRef.current));
+      chatRealtimeStore.getState().prependConversationMessages(conversationId, response.items);
       setHasMore(response.pageInfo.hasMore);
 
       requestAnimationFrame(() => {
@@ -139,8 +139,9 @@ export function ChatPage({ conversationId }: { conversationId: string }) {
     }
     if (isNearBottom()) {
       setShowNewMessages(false);
+      chatRealtimeStore.getState().markConversationRead(conversationId);
     }
-  }, [hasMore, isLoadingMore, loadMore]);
+  }, [conversationId, hasMore, isLoadingMore, loadMore]);
 
   // ── WebSocket ─────────────────────────────────────────────────────────────
 
@@ -148,7 +149,7 @@ export function ChatPage({ conversationId }: { conversationId: string }) {
     (event: ChatServerEvent) => {
       if (event.type === "error") {
         setSendError(event.message);
-        setMessages(markSendingChatMessagesFailed);
+        chatRealtimeStore.getState().markSendingMessagesFailed(conversationId);
         return;
       }
 
@@ -156,17 +157,16 @@ export function ChatPage({ conversationId }: { conversationId: string }) {
 
       const { message, clientMessageId } = event;
 
-      setMessages((prev) =>
-        applyCreatedChatMessage(prev, knownIdsRef.current, message, clientMessageId),
-      );
+      chatRealtimeStore.getState().applyConversationMessageCreated(message, clientMessageId);
 
       if (isNearBottom()) {
+        chatRealtimeStore.getState().markConversationRead(conversationId);
         requestAnimationFrame(scrollToBottom);
       } else if (message.senderId !== user?.id) {
         setShowNewMessages(true);
       }
     },
-    [user?.id, scrollToBottom],
+    [conversationId, user?.id, scrollToBottom],
   );
 
   const { status: wsStatus, send: sendWsMessage } = useConversationSocket({
@@ -190,24 +190,25 @@ export function ChatPage({ conversationId }: { conversationId: string }) {
     }
 
     const clientMessageId = crypto.randomUUID();
-    const optimistic = createOptimisticChatMessage({
+    chatRealtimeStore.getState().appendOptimisticMessage({
       conversationId,
       senderId: user.id,
       body,
       clientMessageId,
     });
-
-    setMessages((prev) => [...prev, optimistic]);
     form.reset();
 
     const sent = sendWsMessage(clientMessageId, body);
 
     if (!sent) {
       setSendError(t("Chat is reconnecting. Try again in a moment."));
-      setMessages((prev) => markChatMessageFailed(prev, clientMessageId));
+      chatRealtimeStore.getState().markMessageFailed(conversationId, clientMessageId);
     }
 
-    if (isNearBottom()) requestAnimationFrame(scrollToBottom);
+    if (isNearBottom()) {
+      chatRealtimeStore.getState().markConversationRead(conversationId);
+      requestAnimationFrame(scrollToBottom);
+    }
   }
 
   // ── render ────────────────────────────────────────────────────────────────

@@ -292,8 +292,17 @@ export interface ChatClientEvent {
   clientMessageId: string;
 }
 
+export interface ChatMessageCreatedEvent {
+  type: "chat.message.created";
+  message: Message;
+  conversationId: ConversationId;
+  taskId: TaskId;
+  clientMessageId?: string;
+}
+
 export type ChatServerEvent =
   | { type: "message.created"; message: Message; clientMessageId?: string }
+  | ChatMessageCreatedEvent
   | { type: "error"; code: string; message: string };
 
 export interface ListReportsQuery extends PaginationQuery {

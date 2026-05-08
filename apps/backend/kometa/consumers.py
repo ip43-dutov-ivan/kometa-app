@@ -4,17 +4,17 @@ from urllib.parse import parse_qs
 
 from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
-from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError as DjangoValidationError
-from django.utils import timezone
-from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
-from rest_framework_simplejwt.tokens import UntypedToken
 
-from .models import Conversation, ConversationMessage
-from .serializers import ConversationMessageSerializer
+from .chat_realtime import (
+    authenticate_token,
+    create_conversation_message,
+    publish_chat_message,
+    serialize_chat_message,
+)
+from .models import Conversation
 
 logger = logging.getLogger(__name__)
-User = get_user_model()
 
 
 class ConversationConsumer(AsyncWebsocketConsumer):
@@ -60,15 +60,7 @@ class ConversationConsumer(AsyncWebsocketConsumer):
 
         client_message_id = str(data.get('clientMessageId', ''))
         message_data = await self._persist_and_serialize(body)
-
-        await self.channel_layer.group_send(
-            self.group_name,
-            {
-                'type': 'chat.message',
-                'message': message_data,
-                'clientMessageId': client_message_id,
-            },
-        )
+        await publish_chat_message(self.conversation, message_data, client_message_id)
 
     async def chat_message(self, event):
         await self.send(json.dumps({
@@ -82,14 +74,7 @@ class ConversationConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def _authenticate(self, token):
-        if not token:
-            return None
-        try:
-            validated = UntypedToken(token)
-            user_id = validated.payload.get('user_id')
-            return User.objects.get(id=user_id)
-        except (InvalidToken, TokenError, User.DoesNotExist):
-            return None
+        return authenticate_token(token)
 
     @database_sync_to_async
     def _get_conversation_for_user(self, user, conversation_id):
@@ -103,11 +88,40 @@ class ConversationConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def _persist_and_serialize(self, body):
-        msg = ConversationMessage.objects.create(
-            conversation=self.conversation,
-            sender=self.user,
-            body=body,
-        )
-        self.conversation.last_message_at = timezone.now()
-        self.conversation.save(update_fields=['last_message_at'])
-        return dict(ConversationMessageSerializer(msg).data)
+        msg = create_conversation_message(self.conversation, self.user, body)
+        return serialize_chat_message(msg)
+
+
+class UserInboxConsumer(AsyncWebsocketConsumer):
+    async def connect(self):
+        qs = self.scope.get('query_string', b'').decode()
+        token = parse_qs(qs).get('token', [None])[0]
+
+        self.user = await database_sync_to_async(authenticate_token)(token)
+        if self.user is None:
+            await self.close(code=4001)
+            return
+
+        self.group_name = f'user_{self.user.id}'
+        await self.channel_layer.group_add(self.group_name, self.channel_name)
+        await self.accept()
+        logger.info('WS inbox connect user=%s', self.user.id)
+
+    async def disconnect(self, code):
+        if hasattr(self, 'group_name'):
+            await self.channel_layer.group_discard(self.group_name, self.channel_name)
+
+    async def receive(self, text_data):
+        await self._send_error('read_only_socket', 'Inbox socket does not accept client events.')
+
+    async def user_chat_message(self, event):
+        await self.send(json.dumps({
+            'type': 'chat.message.created',
+            'message': event['message'],
+            'conversationId': event['conversationId'],
+            'taskId': event['taskId'],
+            'clientMessageId': event.get('clientMessageId', ''),
+        }))
+
+    async def _send_error(self, code, message):
+        await self.send(json.dumps({'type': 'error', 'code': code, 'message': message}))
