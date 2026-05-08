@@ -47,6 +47,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { Switch } from "@/components/ui/switch";
+import { Toaster } from "@/components/ui/sonner";
 import { cn } from "@/lib/utils";
 
 const primaryNavItems = [
@@ -272,6 +273,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             </SheetContent>
           </Sheet>
         </div>
+        <Toaster closeButton position="top-right" />
       </div>
     </ConversationRealtimeProvider>
   );

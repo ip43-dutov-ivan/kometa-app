@@ -15,6 +15,7 @@ export function useUserInboxSocket({ enabled, onEvent }: Options) {
   const reconnectRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const attemptsRef = useRef(0);
   const unmountedRef = useRef(false);
+  const connectionVersionRef = useRef(0);
 
   onEventRef.current = onEvent;
 
@@ -39,12 +40,19 @@ export function useUserInboxSocket({ enabled, onEvent }: Options) {
       proto = window.location.protocol === "https:" ? "wss:" : "ws:";
     }
 
+    if (reconnectRef.current) {
+      clearTimeout(reconnectRef.current);
+      reconnectRef.current = null;
+    }
+
+    const connectionVersion = connectionVersionRef.current + 1;
+    connectionVersionRef.current = connectionVersion;
     const ws = new WebSocket(`${proto}//${wsHost}/ws/me/?token=${encodeURIComponent(token)}`);
     wsRef.current = ws;
     chatRealtimeStore.getState().setInboxConnectionStatus("connecting");
 
     ws.onopen = () => {
-      if (unmountedRef.current) {
+      if (unmountedRef.current || connectionVersionRef.current !== connectionVersion) {
         ws.close();
         return;
       }
@@ -53,6 +61,8 @@ export function useUserInboxSocket({ enabled, onEvent }: Options) {
     };
 
     ws.onmessage = (ev) => {
+      if (connectionVersionRef.current !== connectionVersion) return;
+
       try {
         const data = JSON.parse(ev.data) as ChatServerEvent;
         onEventRef.current(data);
@@ -62,12 +72,15 @@ export function useUserInboxSocket({ enabled, onEvent }: Options) {
     };
 
     ws.onerror = () => {
+      if (connectionVersionRef.current !== connectionVersion) return;
       chatRealtimeStore.getState().setInboxConnectionStatus("error");
     };
 
     ws.onclose = () => {
-      if (unmountedRef.current) return;
-      wsRef.current = null;
+      if (unmountedRef.current || connectionVersionRef.current !== connectionVersion) return;
+      if (wsRef.current === ws) {
+        wsRef.current = null;
+      }
       chatRealtimeStore.getState().setInboxConnectionStatus("disconnected");
       const delay = Math.min(1000 * 2 ** attemptsRef.current, 16_000);
       attemptsRef.current += 1;
@@ -86,6 +99,7 @@ export function useUserInboxSocket({ enabled, onEvent }: Options) {
 
     return () => {
       unmountedRef.current = true;
+      connectionVersionRef.current += 1;
       if (reconnectRef.current) clearTimeout(reconnectRef.current);
       wsRef.current?.close();
       wsRef.current = null;
