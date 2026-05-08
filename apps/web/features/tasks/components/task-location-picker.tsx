@@ -2,10 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ComponentProps } from "react";
+import { useLingui } from "@lingui/react";
 import { Geocoder } from "@mapbox/search-js-react";
 import mapboxgl from "mapbox-gl";
 import { useTheme } from "next-themes";
-import { t } from "@kometa/i18n";
+import { isLocale, t } from "@kometa/i18n";
 import type { TaskLocation } from "@kometa/logic";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,8 +18,6 @@ const MAPBOX_STYLES = {
   light: "mapbox://styles/mapbox/light-v11",
   dark: "mapbox://styles/mapbox/dark-v11",
 } as const;
-const MAPBOX_LANGUAGE = "uk";
-const PINNED_LOCATION_LABEL = "Закріплена локація";
 
 interface TaskLocationPickerProps {
   value: TaskLocation;
@@ -40,6 +39,7 @@ type ReverseGeocodeResponse = {
 };
 
 export function TaskLocationPicker({ value, onChange, disabled = false }: TaskLocationPickerProps) {
+  const { i18n } = useLingui();
   const { resolvedTheme } = useTheme();
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
@@ -51,31 +51,36 @@ export function TaskLocationPicker({ value, onChange, disabled = false }: TaskLo
   const [hasLoadedMap, setHasLoadedMap] = useState(!value.isRemote);
   const mapTheme = resolvedTheme === "light" ? "light" : "dark";
   const geocoderTheme = useMemo(() => getGeocoderTheme(mapTheme), [mapTheme]);
+  const mapboxLanguage = getMapboxLanguage(i18n.locale);
+  const pinnedLocationLabel = t("Pinned location");
   const mapThemeRef = useRef<keyof typeof MAPBOX_STYLES>(mapTheme);
 
   mapThemeRef.current = mapTheme;
 
-  const setPhysicalLocation = useCallback((latitude: number, longitude: number, label: string) => {
-    onChangeRef.current({
-      label: label.trim() || PINNED_LOCATION_LABEL,
-      isRemote: false,
-      latitude,
-      longitude,
-    });
-  }, []);
+  const setPhysicalLocation = useCallback(
+    (latitude: number, longitude: number, label: string) => {
+      onChangeRef.current({
+        label: label.trim() || pinnedLocationLabel,
+        isRemote: false,
+        latitude,
+        longitude,
+      });
+    },
+    [pinnedLocationLabel],
+  );
 
   const setPinnedPhysicalLocation = useCallback(
     async (latitude: number, longitude: number) => {
       const requestId = reverseGeocodeRequestRef.current + 1;
       reverseGeocodeRequestRef.current = requestId;
-      setPhysicalLocation(latitude, longitude, PINNED_LOCATION_LABEL);
+      setPhysicalLocation(latitude, longitude, pinnedLocationLabel);
 
-      const label = await reverseGeocodeLocation(latitude, longitude);
+      const label = await reverseGeocodeLocation(latitude, longitude, mapboxLanguage);
       if (requestId === reverseGeocodeRequestRef.current && label) {
         setPhysicalLocation(latitude, longitude, label);
       }
     },
-    [setPhysicalLocation],
+    [mapboxLanguage, pinnedLocationLabel, setPhysicalLocation],
   );
 
   useEffect(() => {
@@ -212,7 +217,7 @@ export function TaskLocationPicker({ value, onChange, disabled = false }: TaskLo
               onRetrieve={onRetrieve}
               options={{
                 country: "ua",
-                language: MAPBOX_LANGUAGE,
+                language: mapboxLanguage,
                 proximity: {
                   lat: KYIV_CENTER.latitude,
                   lng: KYIV_CENTER.longitude,
@@ -292,7 +297,11 @@ export function TaskLocationPicker({ value, onChange, disabled = false }: TaskLo
   );
 }
 
-async function reverseGeocodeLocation(latitude: number, longitude: number): Promise<string> {
+async function reverseGeocodeLocation(
+  latitude: number,
+  longitude: number,
+  language: string,
+): Promise<string> {
   if (!MAPBOX_ACCESS_TOKEN) {
     return "";
   }
@@ -301,7 +310,7 @@ async function reverseGeocodeLocation(latitude: number, longitude: number): Prom
     const searchParams = new URLSearchParams({
       access_token: MAPBOX_ACCESS_TOKEN,
       country: "ua",
-      language: MAPBOX_LANGUAGE,
+      language,
       latitude: String(latitude),
       limit: "1",
       longitude: String(longitude),
@@ -343,6 +352,10 @@ function getLocationCenter(location: TaskLocation): { latitude: number; longitud
   }
 
   return KYIV_CENTER;
+}
+
+function getMapboxLanguage(locale: string): string {
+  return isLocale(locale) ? locale : "en";
 }
 
 function getGeocoderTheme(theme: keyof typeof MAPBOX_STYLES): GeocoderComponentProps["theme"] {

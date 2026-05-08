@@ -57,18 +57,18 @@ export default function RootLayout({
   return (
     <html lang="en" className="bg-background" suppressHydrationWarning>
       <body className={`${inter.variable} ${spaceGrotesk.variable} font-sans antialiased`}>
-        <KometaI18nProvider>
-          <ThemeProvider
-            attribute="class"
-            defaultTheme="dark"
-            enableSystem={false}
-            disableTransitionOnChange
-          >
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="dark"
+          enableSystem={false}
+          disableTransitionOnChange
+        >
+          <KometaI18nProvider>
             <MockServiceWorker />
             {children}
             {process.env.NODE_ENV === "production" && <Analytics />}
-          </ThemeProvider>
-        </KometaI18nProvider>
+          </KometaI18nProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

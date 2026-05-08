@@ -5,9 +5,12 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { t } from "@kometa/i18n";
 import {
+  Check,
+  ChevronDown,
   ClipboardList,
   Compass,
   Inbox,
+  Languages,
   LogOut,
   Menu,
   MessageSquare,
@@ -17,10 +20,18 @@ import {
   UsersRound,
 } from "lucide-react";
 import { useTheme } from "next-themes";
+import type { Locale } from "@kometa/i18n";
 import { kometaApi } from "@/shared/api/client";
 import { LoadingState } from "@/shared/components/page-state";
+import { useKometaLocale } from "@/shared/i18n/i18n-provider";
 import { useKometaSession } from "@/shared/session/use-kometa-session";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Label } from "@/components/ui/label";
 import {
   Sheet,
@@ -44,6 +55,11 @@ const secondaryNavItems = [
   { href: "/app/my-responses", label: "Responses", icon: Inbox },
   { href: "/app/matches", label: "Matches", icon: UsersRound },
   { href: "/app/profile", label: "Profile", icon: UserRound },
+];
+
+const localeOptions: Array<{ value: Locale; label: string; shortLabel: string }> = [
+  { value: "en", label: "English", shortLabel: "EN" },
+  { value: "uk", label: "Ukrainian", shortLabel: "UK" },
 ];
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -103,6 +119,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </nav>
         <div className="border-t p-3">
           <ThemeSwitch id="desktop-theme-switch" className="mb-3" />
+          <LocaleSwitch className="mb-3" />
           <div className="mb-3 min-w-0 px-3">
             <div className="truncate text-sm font-medium">{user?.name}</div>
           </div>
@@ -164,6 +181,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             </SheetHeader>
             <div className="grid gap-2 px-4">
               <ThemeSwitch id="mobile-theme-switch" className="mb-1" />
+              <LocaleSwitch className="mb-1" />
               {secondaryNavItems.map((item) => (
                 <SheetClose key={item.href} asChild>
                   <Button
@@ -187,6 +205,41 @@ export function AppShell({ children }: { children: ReactNode }) {
         </Sheet>
       </div>
     </div>
+  );
+}
+
+function LocaleSwitch({ className }: { className?: string }) {
+  const { locale, setLocale } = useKometaLocale();
+  const selectedLocale =
+    localeOptions.find((option) => option.value === locale) ?? localeOptions[0];
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline" className={cn("h-11 w-full justify-between px-3", className)}>
+          <span className="flex min-w-0 items-center gap-2">
+            <Languages className="size-4 shrink-0 text-muted-foreground" />
+            <span className="truncate">{t("Language")}</span>
+          </span>
+          <span className="flex shrink-0 items-center gap-2 text-muted-foreground">
+            <span>{selectedLocale.shortLabel}</span>
+            <ChevronDown className="size-4" />
+          </span>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-(--radix-dropdown-menu-trigger-width)">
+        {localeOptions.map((option) => {
+          const isSelected = locale === option.value;
+
+          return (
+            <DropdownMenuItem key={option.value} onSelect={() => setLocale(option.value)}>
+              <span className="min-w-0 flex-1 truncate">{t(option.label)}</span>
+              {isSelected ? <Check className="size-4" /> : null}
+            </DropdownMenuItem>
+          );
+        })}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
