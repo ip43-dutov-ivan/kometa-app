@@ -22,6 +22,31 @@ class CompletionRequestViewSet(ModelViewSet):
             return CompletionRequest.objects.filter(task_id=task_id)
         return CompletionRequest.objects.all()
 
+    def list(self, request, task_id=None):
+        """List completion requests for matched task participants"""
+        try:
+            task = Task.objects.get(id=task_id)
+        except Task.DoesNotExist:
+            return Response(
+                {'detail': 'Task not found.'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        is_owner = task.owner == request.user
+        is_provider = (
+            task.selected_response is not None
+            and task.selected_response.provider == request.user
+        )
+
+        if not (is_owner or is_provider):
+            return Response(
+                {'detail': 'Only matched participants can view completion requests.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        serializer = self.get_serializer(self.get_queryset(), many=True)
+        return Response(serializer.data)
+
     def create(self, request, task_id=None):
         """Request completion for a task"""
         try:
@@ -47,16 +72,21 @@ class CompletionRequestViewSet(ModelViewSet):
         is_owner = task.owner == request.user
         is_provider = task.selected_response.provider == request.user
 
-        if not (is_owner or is_provider):
+        if not is_provider:
             logger.warning(
-                'Completion request denied task_id=%s actor_id=%s owner_id=%s provider_id=%s reason=not_participant',
+                'Completion request denied task_id=%s actor_id=%s owner_id=%s provider_id=%s reason=not_provider',
                 task.id,
                 request.user.id,
                 task.owner_id,
                 task.selected_response.provider_id,
             )
+            detail = (
+                'Only the matched provider can request completion.'
+                if is_owner
+                else 'Only matched participants can request completion.'
+            )
             return Response(
-                {'detail': 'Only matched participants can request completion.'},
+                {'detail': detail},
                 status=status.HTTP_403_FORBIDDEN
             )
 

@@ -176,16 +176,22 @@ class TaskViewSet(
                 {'detail': 'Can only start tasks in matched status.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        if task.owner != request.user and task.selected_response.provider != request.user:
+        if task.selected_response is None:
+            return Response(
+                {'detail': 'Task has no matched provider.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if task.selected_response.provider != request.user:
             logger.warning(
-                'Task start denied task_id=%s actor_id=%s owner_id=%s provider_id=%s reason=not_participant',
+                'Task start denied task_id=%s actor_id=%s owner_id=%s provider_id=%s reason=not_provider',
                 task.id,
                 request.user.id,
                 task.owner_id,
                 task.selected_response.provider_id,
             )
             return Response(
-                {'detail': 'Only the task owner or provider can start this task.'},
+                {'detail': 'Only the matched provider can start this task.'},
                 status=status.HTTP_403_FORBIDDEN
             )
 

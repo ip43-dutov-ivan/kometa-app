@@ -3,6 +3,7 @@ import type {
   BlockUserRequest,
   BlockUserResponse,
   CompletionMutationResponse,
+  CompletionRequest,
   CompletionRequestId,
   Conversation,
   ConversationId,
@@ -115,6 +116,10 @@ export interface KometaApiClient {
       body: RequestCompletionRequest,
       options?: KometaRequestOptions,
     ) => Promise<CompletionMutationResponse>;
+    listCompletionRequests: (
+      taskId: TaskId,
+      options?: KometaRequestOptions,
+    ) => Promise<CompletionRequest[]>;
     confirmCompletion: (
       taskId: TaskId,
       requestId: CompletionRequestId,
@@ -299,6 +304,12 @@ export function createKometaApiClient(options: KometaApiClientOptions = {}): Kom
         post<CompletionMutationResponse>(
           `/tasks/${segment(taskId)}/completion-requests`,
           body,
+          options,
+        ),
+      listCompletionRequests: (taskId, options) =>
+        get<CompletionRequest[]>(
+          `/tasks/${segment(taskId)}/completion-requests`,
+          undefined,
           options,
         ),
       confirmCompletion: (taskId, requestId, options) =>

@@ -152,6 +152,29 @@ export const taskHandlers = [
     return json(task);
   }),
 
+  http.get(apiPath("/tasks/:taskId/completion-requests"), ({ params }) => {
+    const activeUser = requireActiveCurrentUser();
+    if (activeUser.response) {
+      return activeUser.response;
+    }
+
+    const task = tasks.find((item) => item.id === params.taskId);
+
+    if (!task) {
+      return error("Task not found", "task_not_found", 404);
+    }
+
+    if (!isTaskParticipant(task)) {
+      return error(
+        "Only matched participants can view completion requests",
+        "completion_request_forbidden",
+        403,
+      );
+    }
+
+    return json(completionRequests.filter((item) => item.taskId === task.id));
+  }),
+
   http.delete(apiPath("/tasks/:taskId"), ({ params }) => {
     const activeUser = requireActiveCurrentUser();
     if (activeUser.response) {
@@ -203,6 +226,14 @@ export const taskHandlers = [
       return error("Only matched participants can start this task", "task_start_forbidden", 403);
     }
 
+    if (match.providerId !== currentUserId) {
+      return error(
+        "Only the matched provider can start this task",
+        "task_start_requester_forbidden",
+        403,
+      );
+    }
+
     if (task.status !== "matched") {
       return error("Only matched tasks can be started", "task_start_not_allowed", 409);
     }
@@ -225,10 +256,20 @@ export const taskHandlers = [
       return error("Task not found", "task_not_found", 404);
     }
 
-    if (!isTaskParticipant(task)) {
+    const match = getMatchForTask(task.id, currentUserId);
+
+    if (!match) {
       return error(
         "Only matched participants can request completion",
         "completion_request_forbidden",
+        403,
+      );
+    }
+
+    if (match.providerId !== currentUserId) {
+      return error(
+        "Only the matched provider can request completion",
+        "completion_request_requester_forbidden",
         403,
       );
     }

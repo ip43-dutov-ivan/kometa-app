@@ -79,7 +79,7 @@ class TaskWorkflowTests(APITestCase):
         self.assertEqual(task_detail.json()['status'], 'matched')
         self.assertEqual(task_detail.json()['selectedResponseId'], response1_id)
 
-        start_response = self.owner_client.post(f'/api/v1/tasks/{task_id}/start', {}, format='json')
+        start_response = self.provider1_client.post(f'/api/v1/tasks/{task_id}/start', {}, format='json')
         self.assertEqual(start_response.status_code, status.HTTP_200_OK)
         self.assertEqual(start_response.json()['status'], 'inProgress')
 
@@ -263,6 +263,40 @@ class TaskWorkflowTests(APITestCase):
         response = self.owner_client.delete(f'/api/v1/tasks/{task.id}')
 
         self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+
+    def test_owner_cannot_request_completion_for_matched_task(self):
+        task = create_task(owner=self.owner, status='matched')
+        task_response = TaskResponse.objects.create(
+            task=task,
+            provider=self.provider1,
+            comment='I can help.',
+            status='accepted',
+        )
+        task.selected_response = task_response
+        task.save()
+
+        response = self.owner_client.post(
+            f'/api/v1/tasks/{task.id}/completion-requests',
+            {'note': 'Looks done to me.'},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_owner_cannot_start_matched_task(self):
+        task = create_task(owner=self.owner, status='matched')
+        task_response = TaskResponse.objects.create(
+            task=task,
+            provider=self.provider1,
+            comment='I can help.',
+            status='accepted',
+        )
+        task.selected_response = task_response
+        task.save()
+
+        response = self.owner_client.post(f'/api/v1/tasks/{task.id}/start', {}, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_task_update_endpoint_is_not_available(self):
         task = create_task(owner=self.owner)

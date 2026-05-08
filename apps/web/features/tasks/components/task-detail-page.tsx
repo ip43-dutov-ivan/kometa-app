@@ -4,37 +4,16 @@ import { FormEvent, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { t } from "@kometa/i18n";
-import {
-  ArrowLeft,
-  Check,
-  Copy,
-  Flag,
-  MessageSquare,
-  Send,
-  ShieldAlert,
-  Trash2,
-} from "lucide-react";
-import type { Match, Task, User } from "@kometa/logic";
+import { ArrowLeft, ShieldAlert } from "lucide-react";
+import type { CompletionRequest, Match, ResponseStatus, Task, User } from "@kometa/logic";
 import { getTaskCategoryLabel, getTaskLocationLabel, isTaskOwner } from "@kometa/logic";
 import { kometaApi } from "@/shared/api/client";
 import { EmptyState, ErrorState, LoadingState } from "@/shared/components/page-state";
 import { useKometaSession } from "@/shared/session/use-kometa-session";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { TaskDetailActions } from "./task-detail-actions";
 
 export function TaskDetailPage({
   taskId,
@@ -49,8 +28,9 @@ export function TaskDetailPage({
   const [task, setTask] = useState<Task | null>(null);
   const [match, setMatch] = useState<Match | null>(null);
   const [otherUser, setOtherUser] = useState<User | null>(null);
-  const [submittedResponse, setSubmittedResponse] = useState<string | null>(null);
-  const [lastCompletionRequestId, setLastCompletionRequestId] = useState("");
+  const [submittedResponse, setSubmittedResponse] = useState<ResponseStatus | null>(null);
+  const [pendingCompletionRequest, setPendingCompletionRequest] =
+    useState<CompletionRequest | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isMutating, setIsMutating] = useState(false);
@@ -69,6 +49,9 @@ export function TaskDetailPage({
         kometaApi.responses.listMine().catch(() => ({ items: [] })),
       ]);
       const nextMatch = matchesResponse.items.find((item) => item.taskId === taskId) ?? null;
+      const completionRequests = nextMatch
+        ? await kometaApi.tasks.listCompletionRequests(taskId).catch(() => [])
+        : [];
       const otherUserId =
         nextMatch && userId
           ? nextMatch.ownerId === userId
@@ -86,12 +69,15 @@ export function TaskDetailPage({
       setSubmittedResponse(
         myResponses.items.find((response) => response.taskId === taskId)?.status ?? null,
       );
+      setPendingCompletionRequest(
+        completionRequests.find((request) => request.status === "pending") ?? null,
+      );
     } catch (caughtError) {
       setError(caughtError instanceof Error ? caughtError.message : t("Task failed to load."));
     } finally {
       setIsLoading(false);
     }
-  }, [hasHydrated, taskId, user, userId]);
+  }, [hasHydrated, taskId, userId]);
 
   useEffect(() => {
     loadTask();
@@ -154,7 +140,7 @@ export function TaskDetailPage({
     setError(null);
     try {
       const response = await kometaApi.tasks.requestCompletion(taskId, { note });
-      setLastCompletionRequestId(response.completionRequest.id);
+      setPendingCompletionRequest(response.completionRequest);
       setTask(response.task);
     } catch (caughtError) {
       setError(
@@ -176,6 +162,7 @@ export function TaskDetailPage({
     setError(null);
     try {
       const response = await kometaApi.tasks.confirmCompletion(taskId, requestId);
+      setPendingCompletionRequest(response.completionRequest);
       setTask(response.task);
     } catch (caughtError) {
       setError(
@@ -200,6 +187,7 @@ export function TaskDetailPage({
       const response = await kometaApi.tasks.raiseCompletionConcern(taskId, requestId, {
         reason: String(formData.get("reason") ?? ""),
       });
+      setPendingCompletionRequest(response.completionRequest);
       setTask(response.task);
     } catch (caughtError) {
       setError(
@@ -223,7 +211,7 @@ export function TaskDetailPage({
   }
 
   function completionRequestId(form: HTMLFormElement) {
-    return String(new FormData(form).get("requestId") ?? lastCompletionRequestId).trim();
+    return String(new FormData(form).get("requestId") ?? pendingCompletionRequest?.id ?? "").trim();
   }
 
   if (!hasHydrated || isLoading) {
@@ -293,7 +281,22 @@ export function TaskDetailPage({
           </div>
           {error ? <ErrorState message={error} /> : null}
           <div className="grid gap-2">
-            {renderTaskActions(task, owner)}
+            <TaskDetailActions
+              task={task}
+              match={match}
+              user={user}
+              userId={userId}
+              isOwner={owner}
+              isMutating={isMutating}
+              submittedResponse={submittedResponse}
+              pendingCompletionRequest={pendingCompletionRequest}
+              onRespond={respond}
+              onStartTask={startTask}
+              onDeleteTask={cancelTask}
+              onRequestCompletion={requestCompletion}
+              onConfirmCompletion={confirmCompletion}
+              onRaiseConcern={raiseConcern}
+            />
             {reportHref ? (
               <Button asChild variant="ghost">
                 <Link href={reportHref}>
@@ -307,127 +310,4 @@ export function TaskDetailPage({
       </div>
     </div>
   );
-
-  function renderTaskActions(activeTask: Task, isOwner: boolean) {
-    if (activeTask.status === "open") {
-      return isOwner ? (
-        <>
-          <Button asChild variant="outline">
-            <Link href={`/app/tasks/new?duplicateFrom=${encodeURIComponent(activeTask.id)}`}>
-              <Copy />
-              {t("Duplicate task")}
-            </Link>
-          </Button>
-          <Button asChild>
-            <Link href={`/app/tasks/${activeTask.id}/responses`}>
-              <MessageSquare />
-              {t("View responses")}
-            </Link>
-          </Button>
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button variant="destructive" disabled={isMutating}>
-                <Trash2 />
-                {t("Delete task")}
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>{t("Delete this task?")}</AlertDialogTitle>
-                <AlertDialogDescription>
-                  {t(
-                    "This cancels the task and declines pending responses. The task history is kept.",
-                  )}
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>{t("Cancel")}</AlertDialogCancel>
-                <AlertDialogAction onClick={cancelTask}>{t("Delete task")}</AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        </>
-      ) : (
-        user && (
-          <form className="grid gap-2" onSubmit={respond}>
-            <Textarea name="comment" rows={4} placeholder={t("How can you help?")} required />
-            <Button type="submit" disabled={isMutating || Boolean(submittedResponse)}>
-              <Send />
-              {submittedResponse ? `${t("Response")} ${t(submittedResponse)}` : t("Respond")}
-            </Button>
-          </form>
-        )
-      );
-    }
-
-    if (activeTask.status === "matched" || activeTask.status === "inProgress") {
-      return (
-        <>
-          {match ? (
-            <Button asChild>
-              <Link href={`/app/conversations/${match.conversationId}`}>
-                <MessageSquare />
-                {t("Open chat")}
-              </Link>
-            </Button>
-          ) : null}
-          {activeTask.status === "matched" ? (
-            <Button variant="outline" onClick={startTask} disabled={isMutating}>
-              <Flag />
-              {t("Start task")}
-            </Button>
-          ) : null}
-          <form className="grid gap-2" onSubmit={requestCompletion}>
-            <Textarea name="note" rows={3} placeholder={t("Completion note")} />
-            <Button type="submit" variant="outline" disabled={isMutating}>
-              <Check />
-              {t("Request completion")}
-            </Button>
-          </form>
-        </>
-      );
-    }
-
-    if (activeTask.status === "completionRequested") {
-      return (
-        <>
-          <form className="grid gap-2" onSubmit={confirmCompletion}>
-            <Input
-              name="requestId"
-              placeholder={t("Completion request id")}
-              defaultValue={lastCompletionRequestId}
-            />
-            <Button type="submit" disabled={isMutating}>
-              <Check />
-              {t("Confirm completion")}
-            </Button>
-          </form>
-          <form className="grid gap-2" onSubmit={raiseConcern}>
-            <Input
-              name="requestId"
-              placeholder={t("Completion request id")}
-              defaultValue={lastCompletionRequestId}
-            />
-            <Textarea name="reason" rows={3} placeholder={t("Concern reason")} required />
-            <Button type="submit" variant="outline" disabled={isMutating}>
-              {t("Raise concern")}
-            </Button>
-          </form>
-        </>
-      );
-    }
-
-    if (activeTask.status === "completed") {
-      return (
-        <Button asChild>
-          <Link href={`/app/tasks/${activeTask.id}/feedback`}>
-            <Check />
-            {t("Feedback")}
-          </Link>
-        </Button>
-      );
-    }
-
-    return null;
-  }
 }
