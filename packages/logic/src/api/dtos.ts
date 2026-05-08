@@ -286,6 +286,16 @@ export interface ListMessagesQuery {
   limit?: number;
 }
 
+export interface ChatClientEvent {
+  type: "message.create";
+  body: string;
+  clientMessageId: string;
+}
+
+export type ChatServerEvent =
+  | { type: "message.created"; message: Message; clientMessageId?: string }
+  | { type: "error"; code: string; message: string };
+
 export interface ListReportsQuery extends PaginationQuery {
   status?: ReportStatus;
 }

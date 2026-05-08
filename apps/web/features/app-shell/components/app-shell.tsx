@@ -21,10 +21,12 @@ import {
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import type { Locale } from "@kometa/i18n";
+import { buildOwnTasksQuery } from "@kometa/logic";
 import { kometaApi } from "@/shared/api/client";
 import { LoadingState } from "@/shared/components/page-state";
 import { useKometaLocale } from "@/shared/i18n/i18n-provider";
 import { useKometaSession } from "@/shared/session/use-kometa-session";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -66,6 +68,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [pendingOwnerResponseCount, setPendingOwnerResponseCount] = useState(0);
   const { hasHydrated, isAuthenticated, user, clearSession } = useKometaSession();
 
   useEffect(() => {
@@ -73,6 +76,47 @@ export function AppShell({ children }: { children: ReactNode }) {
       router.replace("/login");
     }
   }, [hasHydrated, isAuthenticated, router]);
+
+  useEffect(() => {
+    if (!hasHydrated || !isAuthenticated) {
+      setPendingOwnerResponseCount(0);
+      return;
+    }
+
+    let isActive = true;
+
+    async function loadPendingOwnerResponses() {
+      try {
+        const ownTasks = await kometaApi.tasks.list(buildOwnTasksQuery());
+        const openTasks = ownTasks.items.filter((task) => task.status === "open");
+        const responseLists = await Promise.all(
+          openTasks.map((task) =>
+            kometaApi.tasks
+              .listResponses(task.id, { status: "pending", limit: 1 })
+              .catch(() => ({ pageInfo: { total: 0 } })),
+          ),
+        );
+        const nextCount = responseLists.reduce(
+          (total, responseList) => total + responseList.pageInfo.total,
+          0,
+        );
+
+        if (isActive) {
+          setPendingOwnerResponseCount(nextCount);
+        }
+      } catch {
+        if (isActive) {
+          setPendingOwnerResponseCount(0);
+        }
+      }
+    }
+
+    loadPendingOwnerResponses();
+
+    return () => {
+      isActive = false;
+    };
+  }, [hasHydrated, isAuthenticated, pathname]);
 
   async function logout() {
     try {
@@ -112,7 +156,12 @@ export function AppShell({ children }: { children: ReactNode }) {
             >
               <Link href={item.href}>
                 <item.icon />
-                {t(item.label)}
+                <span className="min-w-0 flex-1 truncate text-left">{t(item.label)}</span>
+                {item.href === "/app/my-tasks" && pendingOwnerResponseCount ? (
+                  <Badge variant="default" className="ml-auto h-5 min-w-5 px-1.5">
+                    {pendingOwnerResponseCount}
+                  </Badge>
+                ) : null}
               </Link>
             </Button>
           ))}
@@ -150,13 +199,18 @@ export function AppShell({ children }: { children: ReactNode }) {
                 variant="ghost"
                 asChild
                 className={cn(
-                  "h-14 flex-col gap-1 px-1 text-xs",
+                  "relative h-14 flex-col gap-1 px-1 text-xs",
                   isActive(item.href) && "bg-accent text-accent-foreground",
                 )}
               >
                 <Link href={item.href}>
                   <item.icon />
-                  {t(item.label)}
+                  <span className="leading-none">{t(item.label)}</span>
+                  {item.href === "/app/my-tasks" && pendingOwnerResponseCount ? (
+                    <Badge className="absolute right-1 top-1 h-5 min-w-5 px-1 text-[0.625rem]">
+                      {pendingOwnerResponseCount}
+                    </Badge>
+                  ) : null}
                 </Link>
               </Button>
             ))}

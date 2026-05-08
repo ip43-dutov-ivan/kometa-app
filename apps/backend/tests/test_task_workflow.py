@@ -71,7 +71,8 @@ class TaskWorkflowTests(APITestCase):
             format='json',
         )
         self.assertEqual(accept_response.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(accept_response.json()['status'], 'accepted')
+        self.assertEqual(accept_response.json()['responseId'], response1_id)
+        self.assertTrue(accept_response.json()['conversationId'])
 
         task_detail = self.owner_client.get(f'/api/v1/tasks/{task_id}')
         self.assertEqual(task_detail.status_code, status.HTTP_200_OK)
@@ -85,7 +86,7 @@ class TaskWorkflowTests(APITestCase):
         matches_response = self.owner_client.get('/api/v1/matches?activeOnly=true&limit=20&offset=0')
         self.assertEqual(matches_response.status_code, status.HTTP_200_OK)
         self.assertEqual(matches_response.json()['pageInfo']['total'], 1)
-        conversation_id = matches_response.json()['items'][0]['conversationId']
+        conversation_id = accept_response.json()['conversationId']
 
         conversations_response = self.owner_client.get('/api/v1/conversations?limit=20&offset=0')
         self.assertEqual(conversations_response.status_code, status.HTTP_200_OK)

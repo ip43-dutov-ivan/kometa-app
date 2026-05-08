@@ -157,6 +157,7 @@ export function TaskDiscoveryPage() {
 
 export function MyTasksPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [pendingResponseCounts, setPendingResponseCounts] = useState<Record<string, number>>({});
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -165,8 +166,21 @@ export function MyTasksPage() {
     async function loadTasks() {
       try {
         const response = await kometaApi.tasks.list(buildOwnTasksQuery());
+        const visibleTasks = response.items.filter((task) => task.status !== "cancelled");
+        const openTasks = visibleTasks.filter((task) => task.status === "open");
+        const responseCountPairs = await Promise.all(
+          openTasks.map(async (task) => {
+            const responseList = await kometaApi.tasks
+              .listResponses(task.id, { status: "pending", limit: 1 })
+              .catch(() => ({ pageInfo: { total: 0 } }));
+
+            return [task.id, responseList.pageInfo.total] as const;
+          }),
+        );
+
         if (isActive) {
-          setTasks(response.items.filter((task) => task.status !== "cancelled"));
+          setTasks(visibleTasks);
+          setPendingResponseCounts(Object.fromEntries(responseCountPairs));
         }
       } catch (caughtError) {
         if (isActive) {
@@ -210,7 +224,13 @@ export function MyTasksPage() {
       ) : tasks.length ? (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {tasks.map((task) => (
-            <TaskCard key={task.id} task={task} href={`/app/my-tasks/${task.id}`} />
+            <TaskCard
+              key={task.id}
+              task={task}
+              href={`/app/my-tasks/${task.id}`}
+              pendingResponseCount={pendingResponseCounts[task.id] ?? 0}
+              reviewHref={`/app/tasks/${task.id}/responses`}
+            />
           ))}
         </div>
       ) : (

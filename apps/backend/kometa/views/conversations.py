@@ -101,9 +101,18 @@ class ConversationMessageViewSet(ModelViewSet):
             limit = 50
 
         limit = max(1, min(limit, 100))
+        total = queryset.count()
         items = queryset[:limit]
         serializer = self.get_serializer(items, many=True)
-        return Response({'items': serializer.data})
+        return Response({
+            'items': serializer.data,
+            'pageInfo': {
+                'limit': limit,
+                'offset': 0,
+                'total': total,
+                'hasMore': total > limit,
+            },
+        })
 
     def create(self, request, conversation_id=None):
         conversation = self.get_conversation()

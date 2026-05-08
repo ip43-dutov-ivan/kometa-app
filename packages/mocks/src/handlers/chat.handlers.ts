@@ -43,13 +43,22 @@ export const chatHandlers = [
     const url = new URL(request.url);
     const before = url.searchParams.get("before");
     const limit = Number.parseInt(url.searchParams.get("limit") ?? "50", 10);
-    const result = messages
+    const matchingMessages = messages
       .filter((message) => message.conversationId === params.conversationId)
       .filter((message) => !before || message.createdAt < before)
-      .sort((first, second) => first.createdAt.localeCompare(second.createdAt))
-      .slice(-Math.max(1, Number.isFinite(limit) ? limit : 50));
+      .sort((first, second) => first.createdAt.localeCompare(second.createdAt));
+    const effectiveLimit = Math.max(1, Number.isFinite(limit) ? limit : 50);
+    const result = matchingMessages.slice(-effectiveLimit);
 
-    return json(result);
+    return json({
+      items: result,
+      pageInfo: {
+        limit: effectiveLimit,
+        offset: 0,
+        total: matchingMessages.length,
+        hasMore: matchingMessages.length > effectiveLimit,
+      },
+    });
   }),
 
   http.post(apiPath("/conversations/:conversationId/messages"), async ({ params, request }) => {

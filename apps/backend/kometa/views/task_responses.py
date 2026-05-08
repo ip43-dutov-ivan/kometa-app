@@ -7,7 +7,7 @@ from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
 from ..models import Conversation, Match, Task, TaskResponse
-from ..serializers import TaskResponseSerializer
+from ..serializers import MatchSerializer, TaskResponseSerializer
 
 logger = logging.getLogger(__name__)
 
@@ -206,5 +206,5 @@ class TaskResponseViewSet(ModelViewSet):
             task.status,
         )
 
-        serializer = self.get_serializer(response_obj)
+        serializer = MatchSerializer(match)
         return Response(serializer.data, status=status.HTTP_201_CREATED)

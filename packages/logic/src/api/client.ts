@@ -170,7 +170,7 @@ export interface KometaApiClient {
       conversationId: ConversationId,
       query?: ListMessagesQuery,
       options?: KometaRequestOptions,
-    ) => Promise<Message[]>;
+    ) => Promise<ListResponse<Message>>;
     sendMessage: (
       conversationId: ConversationId,
       body: SendMessageRequest,
@@ -340,7 +340,11 @@ export function createKometaApiClient(options: KometaApiClientOptions = {}): Kom
       get: (conversationId, options) =>
         get<Conversation>(`/conversations/${segment(conversationId)}`, undefined, options),
       listMessages: (conversationId, query, options) =>
-        get<Message[]>(`/conversations/${segment(conversationId)}/messages`, query, options),
+        get<ListResponse<Message>>(
+          `/conversations/${segment(conversationId)}/messages`,
+          query,
+          options,
+        ),
       sendMessage: (conversationId, body, options) =>
         post<Message>(`/conversations/${segment(conversationId)}/messages`, body, options),
     },
