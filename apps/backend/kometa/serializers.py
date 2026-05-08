@@ -1,3 +1,6 @@
+import re
+import unicodedata
+
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 from django.contrib.auth import authenticate
@@ -102,6 +105,12 @@ class TaskSerializer(serializers.ModelSerializer):
             location['latitude'] = instance.location_latitude
         if instance.location_longitude is not None:
             location['longitude'] = instance.location_longitude
+        if instance.location_city_id:
+            location['cityId'] = instance.location_city_id
+        if instance.location_city_label:
+            location['cityLabel'] = instance.location_city_label
+        if instance.location_country_code:
+            location['countryCode'] = instance.location_country_code
         data['location'] = location
         return data
 
@@ -120,6 +129,9 @@ class TaskSerializer(serializers.ModelSerializer):
                 'isRemote': True,
                 'latitude': None,
                 'longitude': None,
+                'cityId': 'remote',
+                'cityLabel': 'Remote',
+                'countryCode': '',
             }
 
         latitude = value.get('latitude')
@@ -140,11 +152,17 @@ class TaskSerializer(serializers.ModelSerializer):
         if longitude < -180 or longitude > 180:
             raise serializers.ValidationError({'longitude': 'Longitude must be between -180 and 180.'})
 
+        city_label = str(value.get('cityLabel', '')).strip() or label.split(',')[0].strip()
+        country_code = str(value.get('countryCode', '')).strip().upper()[:2]
+
         return {
             'label': label,
             'isRemote': False,
             'latitude': latitude,
             'longitude': longitude,
+            'cityId': str(value.get('cityId', '')).strip() or self.get_fallback_city_id(city_label, country_code),
+            'cityLabel': city_label,
+            'countryCode': country_code,
         }
 
     def create(self, validated_data):
@@ -163,6 +181,18 @@ class TaskSerializer(serializers.ModelSerializer):
         data['location_is_remote'] = location['isRemote']
         data['location_latitude'] = location['latitude']
         data['location_longitude'] = location['longitude']
+        data['location_city_id'] = location['cityId']
+        data['location_city_label'] = location['cityLabel']
+        data['location_country_code'] = location['countryCode']
+
+    def get_fallback_city_id(self, city_label, country_code):
+        normalized = unicodedata.normalize('NFKD', city_label)
+        ascii_value = normalized.encode('ascii', 'ignore').decode('ascii')
+        city_slug = re.sub(r'[^a-z0-9]+', '-', ascii_value.lower()).strip('-')
+        if not city_slug:
+            return ''
+
+        return f'{country_code.lower() if country_code else "place"}-{city_slug}'
 
     def validate_compensation(self, value):
         if not isinstance(value, dict):

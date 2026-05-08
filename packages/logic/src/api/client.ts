@@ -17,6 +17,7 @@ import type {
   ListMyResponsesQuery,
   ListReportsQuery,
   ListResponse,
+  ListTaskLocationFacetsQuery,
   ListResponsesQuery,
   ListTasksQuery,
   LoginRequest,
@@ -33,6 +34,7 @@ import type {
   SendMessageRequest,
   Task,
   TaskId,
+  TaskLocationFacet,
   TaskResponse,
   UnblockUserResponse,
   UpdateCurrentUserRequest,
@@ -100,6 +102,10 @@ export interface KometaApiClient {
   };
   tasks: {
     list: (query?: ListTasksQuery, options?: KometaRequestOptions) => Promise<ListResponse<Task>>;
+    listLocationFacets: (
+      query?: ListTaskLocationFacetsQuery,
+      options?: KometaRequestOptions,
+    ) => Promise<TaskLocationFacet[]>;
     create: (body: CreateTaskRequest, options?: KometaRequestOptions) => Promise<Task>;
     get: (taskId: TaskId, options?: KometaRequestOptions) => Promise<Task>;
     delete: (taskId: TaskId, options?: KometaRequestOptions) => Promise<Task>;
@@ -283,6 +289,8 @@ export function createKometaApiClient(options: KometaApiClientOptions = {}): Kom
     },
     tasks: {
       list: (query, options) => get<ListResponse<Task>>("/tasks", query, options),
+      listLocationFacets: (query, options) =>
+        get<TaskLocationFacet[]>("/tasks/location-facets", query, options),
       create: (body, options) => post<Task>("/tasks", body, options),
       get: (taskId, options) => get<Task>(`/tasks/${segment(taskId)}`, undefined, options),
       delete: (taskId, options) => del<Task>(`/tasks/${segment(taskId)}`, options),

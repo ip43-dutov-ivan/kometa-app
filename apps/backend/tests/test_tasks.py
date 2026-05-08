@@ -20,6 +20,9 @@ class TaskEndpointTests(APITestCase):
                 'isRemote': False,
                 'latitude': 50.4499,
                 'longitude': 30.4615,
+                'cityId': 'ua-kyiv',
+                'cityLabel': 'Kyiv',
+                'countryCode': 'UA',
             }),
             format='json',
         )
@@ -31,6 +34,8 @@ class TaskEndpointTests(APITestCase):
         self.assertFalse(create_data['location']['isRemote'])
         self.assertEqual(create_data['location']['latitude'], 50.4499)
         self.assertEqual(create_data['location']['longitude'], 30.4615)
+        self.assertEqual(create_data['location']['cityId'], 'ua-kyiv')
+        self.assertEqual(create_data['location']['cityLabel'], 'Kyiv')
 
         retrieve_response = self.owner_client.get(f'/api/v1/tasks/{task_id}')
         self.assertEqual(retrieve_response.status_code, status.HTTP_200_OK)
@@ -51,6 +56,14 @@ class TaskEndpointTests(APITestCase):
         location_response = self.other_client.get('/api/v1/tasks?location=KPI&limit=10')
         self.assertEqual(location_response.status_code, status.HTTP_200_OK)
         self.assertEqual(location_response.json()['pageInfo']['total'], 1)
+
+        city_response = self.other_client.get('/api/v1/tasks?locationCity=ua-kyiv&limit=10')
+        self.assertEqual(city_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(city_response.json()['pageInfo']['total'], 1)
+
+        facets_response = self.other_client.get('/api/v1/tasks/location-facets?available=true&status=open')
+        self.assertEqual(facets_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(facets_response.json(), [{'id': 'ua-kyiv', 'label': 'Kyiv', 'count': 1}])
 
     def test_task_update_methods_are_not_available(self):
         task = create_task(owner=self.owner)
@@ -79,7 +92,10 @@ class TaskEndpointTests(APITestCase):
         )
 
         self.assertEqual(create_response.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(create_response.json()['location'], {'label': 'Remote', 'isRemote': True})
+        self.assertEqual(
+            create_response.json()['location'],
+            {'label': 'Remote', 'isRemote': True, 'cityId': 'remote', 'cityLabel': 'Remote'},
+        )
 
     def test_physical_task_requires_coordinates(self):
         create_response = self.owner_client.post(

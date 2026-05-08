@@ -30,12 +30,30 @@ type GeocoderFeature = Parameters<NonNullable<GeocoderComponentProps["onRetrieve
 type ReverseGeocodeResponse = {
   features?: Array<{
     properties?: {
+      context?: MapboxFeatureContext;
+      feature_type?: string;
       full_address?: string;
+      mapbox_id?: string;
       name_preferred?: string;
       place_formatted?: string;
       name?: string;
     };
   }>;
+};
+
+type MapboxContextItem = {
+  country_code?: string;
+  mapbox_id?: string;
+  name?: string;
+  name_preferred?: string;
+};
+
+type MapboxFeatureContext = {
+  country?: MapboxContextItem;
+  district?: MapboxContextItem;
+  locality?: MapboxContextItem;
+  place?: MapboxContextItem;
+  region?: MapboxContextItem;
 };
 
 export function TaskLocationPicker({ value, onChange, disabled = false }: TaskLocationPickerProps) {
@@ -45,6 +63,7 @@ export function TaskLocationPicker({ value, onChange, disabled = false }: TaskLo
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const markerRef = useRef<mapboxgl.Marker | null>(null);
   const latestValueRef = useRef(value);
+  const lastRetrievedLocationRef = useRef<TaskLocation | null>(null);
   const disabledRef = useRef(disabled);
   const onChangeRef = useRef(onChange);
   const reverseGeocodeRequestRef = useRef(0);
@@ -58,13 +77,19 @@ export function TaskLocationPicker({ value, onChange, disabled = false }: TaskLo
   mapThemeRef.current = mapTheme;
 
   const setPhysicalLocation = useCallback(
-    (latitude: number, longitude: number, label: string) => {
-      onChangeRef.current({
+    (latitude: number, longitude: number, label: string, city?: TaskLocationCity) => {
+      const nextLocation = {
         label: label.trim() || pinnedLocationLabel,
         isRemote: false,
         latitude,
         longitude,
-      });
+        cityId: city?.id,
+        cityLabel: city?.label,
+        countryCode: city?.countryCode,
+      };
+
+      lastRetrievedLocationRef.current = nextLocation;
+      onChangeRef.current(nextLocation);
     },
     [pinnedLocationLabel],
   );
@@ -75,9 +100,9 @@ export function TaskLocationPicker({ value, onChange, disabled = false }: TaskLo
       reverseGeocodeRequestRef.current = requestId;
       setPhysicalLocation(latitude, longitude, pinnedLocationLabel);
 
-      const label = await reverseGeocodeLocation(latitude, longitude, mapboxLanguage);
-      if (requestId === reverseGeocodeRequestRef.current && label) {
-        setPhysicalLocation(latitude, longitude, label);
+      const location = await reverseGeocodeLocation(latitude, longitude, mapboxLanguage);
+      if (requestId === reverseGeocodeRequestRef.current && location.label) {
+        setPhysicalLocation(latitude, longitude, location.label, location.city);
       }
     },
     [mapboxLanguage, pinnedLocationLabel, setPhysicalLocation],
@@ -190,7 +215,12 @@ export function TaskLocationPicker({ value, onChange, disabled = false }: TaskLo
     const latitude = feature.properties.coordinates.latitude;
     const longitude = feature.properties.coordinates.longitude;
 
-    setPhysicalLocation(latitude, longitude, getFeatureLabel(feature.properties));
+    setPhysicalLocation(
+      latitude,
+      longitude,
+      getFeatureLabel(feature.properties),
+      getFeatureCity(feature.properties),
+    );
   }
 
   return (
@@ -213,7 +243,22 @@ export function TaskLocationPicker({ value, onChange, disabled = false }: TaskLo
             <Geocoder
               accessToken={MAPBOX_ACCESS_TOKEN}
               value={value.label}
-              onChange={(label) => onChange({ ...value, label })}
+              onChange={(label) => {
+                if (label === lastRetrievedLocationRef.current?.label) {
+                  onChange(lastRetrievedLocationRef.current);
+                  return;
+                }
+
+                onChange({
+                  label,
+                  isRemote: false,
+                  latitude: undefined,
+                  longitude: undefined,
+                  cityId: undefined,
+                  cityLabel: undefined,
+                  countryCode: undefined,
+                });
+              }}
               onRetrieve={onRetrieve}
               options={{
                 country: "ua",
@@ -301,9 +346,9 @@ async function reverseGeocodeLocation(
   latitude: number,
   longitude: number,
   language: string,
-): Promise<string> {
+): Promise<{ label: string; city?: TaskLocationCity }> {
   if (!MAPBOX_ACCESS_TOKEN) {
-    return "";
+    return { label: "" };
   }
 
   try {
@@ -320,16 +365,24 @@ async function reverseGeocodeLocation(
     );
 
     if (!response.ok) {
-      return "";
+      return { label: "" };
     }
 
     const data = (await response.json()) as ReverseGeocodeResponse;
     const properties = data.features?.[0]?.properties;
 
-    return properties ? getFeatureLabel(properties) : "";
+    return properties
+      ? { label: getFeatureLabel(properties), city: getFeatureCity(properties) }
+      : { label: "" };
   } catch {
-    return "";
+    return { label: "" };
   }
+}
+
+interface TaskLocationCity {
+  id: string;
+  label: string;
+  countryCode?: string;
 }
 
 function getFeatureLabel(properties: {
@@ -344,6 +397,45 @@ function getFeatureLabel(properties: {
     properties.name ||
     ""
   );
+}
+
+function getFeatureCity(properties: {
+  context?: MapboxFeatureContext;
+  feature_type?: string;
+  mapbox_id?: string;
+  name_preferred?: string;
+  name?: string;
+}): TaskLocationCity | undefined {
+  const context = properties.context;
+  const contextCity = context?.place ?? context?.locality ?? context?.district;
+  const countryCode = context?.country?.country_code?.toUpperCase();
+  const cityLabel =
+    contextCity?.name_preferred ||
+    contextCity?.name ||
+    (properties.feature_type === "place" ? properties.name_preferred || properties.name : "");
+
+  if (!cityLabel) {
+    return undefined;
+  }
+
+  return {
+    id:
+      contextCity?.mapbox_id || properties.mapbox_id || buildFallbackCityId(cityLabel, countryCode),
+    label: cityLabel,
+    countryCode,
+  };
+}
+
+function buildFallbackCityId(cityLabel: string, countryCode?: string): string {
+  const countryPrefix = countryCode?.toLocaleLowerCase() || "place";
+  const citySlug = cityLabel
+    .normalize("NFKD")
+    .replace(/[^\w\s-]/g, "")
+    .trim()
+    .toLocaleLowerCase()
+    .replace(/[-\s]+/g, "-");
+
+  return `${countryPrefix}-${citySlug}`;
 }
 
 function getLocationCenter(location: TaskLocation): { latitude: number; longitude: number } {

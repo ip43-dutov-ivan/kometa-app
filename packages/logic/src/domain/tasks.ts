@@ -92,6 +92,7 @@ const TASK_CATEGORY_SEARCH_INDEX = new Fuse(TASK_CATEGORIES, {
 export interface TaskFilters {
   category?: string;
   location?: string;
+  locationCity?: string;
 }
 
 export interface TaskFormValues {
@@ -108,6 +109,7 @@ export function buildAvailableTasksQuery(filters: TaskFilters = {}): ListTasksQu
     status: "open",
     category: filters.category ? normalizeTaskCategoryId(filters.category) : undefined,
     location: filters.location?.trim() || undefined,
+    locationCity: filters.locationCity?.trim() || undefined,
   };
 }
 
@@ -144,6 +146,9 @@ export function normalizeTaskLocation(location: TaskLocation): TaskLocation {
     isRemote: false,
     latitude: location.latitude,
     longitude: location.longitude,
+    cityId: location.cityId?.trim() || undefined,
+    cityLabel: location.cityLabel?.trim() || undefined,
+    countryCode: location.countryCode?.trim().toUpperCase() || undefined,
   };
 }
 

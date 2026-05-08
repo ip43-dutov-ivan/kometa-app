@@ -41,5 +41,8 @@ def create_task(owner, **overrides):
         'location_is_remote': location.get('isRemote', False),
         'location_latitude': location.get('latitude'),
         'location_longitude': location.get('longitude'),
+        'location_city_id': location.get('cityId', 'remote' if location.get('isRemote', False) else ''),
+        'location_city_label': location.get('cityLabel', 'Remote' if location.get('isRemote', False) else ''),
+        'location_country_code': location.get('countryCode', ''),
     })
     return Task.objects.create(owner=owner, **defaults)

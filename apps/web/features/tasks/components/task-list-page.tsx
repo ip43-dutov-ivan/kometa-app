@@ -4,29 +4,30 @@ import { FormEvent, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Plus, Search, X } from "lucide-react";
 import { t } from "@kometa/i18n";
-import type { Task } from "@kometa/logic";
+import type { Task, TaskLocationFacet } from "@kometa/logic";
 import { buildAvailableTasksQuery, buildOwnTasksQuery } from "@kometa/logic";
 import { kometaApi } from "@/shared/api/client";
 import { EmptyState, ErrorState, LoadingState } from "@/shared/components/page-state";
+import { SearchSelect } from "@/shared/components/search-select";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { TaskCategorySelect } from "./task-category-select";
 import { TaskCard } from "./task-card";
 
 export function TaskDiscoveryPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [locationFacets, setLocationFacets] = useState<TaskLocationFacet[]>([]);
   const [category, setCategory] = useState("");
-  const [location, setLocation] = useState("");
+  const [locationCity, setLocationCity] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const loadTasks = useCallback(async (nextCategory: string, nextLocation: string) => {
+  const loadTasks = useCallback(async (nextCategory: string, nextLocationCity: string) => {
     setIsLoading(true);
     setError(null);
     try {
       const response = await kometaApi.tasks.list(
-        buildAvailableTasksQuery({ category: nextCategory, location: nextLocation }),
+        buildAvailableTasksQuery({ category: nextCategory, locationCity: nextLocationCity }),
       );
       setTasks(response.items);
     } catch (caughtError) {
@@ -36,13 +37,33 @@ export function TaskDiscoveryPage() {
     }
   }, []);
 
+  const loadLocationFacets = useCallback(async (nextCategory: string) => {
+    try {
+      const facets = await kometaApi.tasks.listLocationFacets(
+        buildAvailableTasksQuery({ category: nextCategory }),
+      );
+      setLocationFacets(facets);
+    } catch {
+      setLocationFacets([]);
+    }
+  }, []);
+
   useEffect(() => {
     loadTasks("", "");
   }, [loadTasks]);
 
+  useEffect(() => {
+    loadLocationFacets(category);
+  }, [category, loadLocationFacets]);
+
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    loadTasks(category, location);
+    loadTasks(category, locationCity);
+  }
+
+  function onCategoryChange(nextCategory: string) {
+    setCategory(nextCategory);
+    setLocationCity("");
   }
 
   return (
@@ -70,7 +91,7 @@ export function TaskDiscoveryPage() {
           <div className="flex gap-2">
             <TaskCategorySelect
               value={category}
-              onValueChange={setCategory}
+              onValueChange={onCategoryChange}
               placeholder={t("All categories")}
               searchPlaceholder={t("Search categories...")}
             />
@@ -80,7 +101,7 @@ export function TaskDiscoveryPage() {
                 variant="outline"
                 size="icon"
                 aria-label={t("Clear category")}
-                onClick={() => setCategory("")}
+                onClick={() => onCategoryChange("")}
               >
                 <X />
               </Button>
@@ -88,12 +109,30 @@ export function TaskDiscoveryPage() {
           </div>
         </div>
         <div className="grid gap-2">
-          <Label htmlFor="location">{t("Location")}</Label>
-          <Input
-            id="location"
-            value={location}
-            onChange={(event) => setLocation(event.target.value)}
-          />
+          <Label>{t("Location")}</Label>
+          <div className="flex gap-2">
+            <SearchSelect<TaskLocationFacet>
+              value={locationCity}
+              items={locationFacets}
+              onValueChange={(nextValue) => setLocationCity(nextValue)}
+              getItemValue={(item) => item.id}
+              getItemLabel={(item) => `${item.label} (${item.count})`}
+              placeholder={t("All locations")}
+              searchPlaceholder={t("Search locations...")}
+              emptyMessage={t("No available locations.")}
+            />
+            {locationCity ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                aria-label={t("Clear location")}
+                onClick={() => setLocationCity("")}
+              >
+                <X />
+              </Button>
+            ) : null}
+          </div>
         </div>
         <Button type="submit" className="self-end">
           <Search />

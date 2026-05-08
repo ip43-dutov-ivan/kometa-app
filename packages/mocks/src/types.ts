@@ -57,6 +57,9 @@ export interface TaskLocation {
   isRemote: boolean;
   latitude?: number;
   longitude?: number;
+  cityId?: string;
+  cityLabel?: string;
+  countryCode?: string;
 }
 
 export interface Task {

@@ -5,7 +5,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
-from django.db.models import Q
+from django.db.models import Count, Q
 from ..models import Feedback, Task
 from ..serializers import FeedbackSerializer, TaskSerializer
 
@@ -46,6 +46,7 @@ class TaskViewSet(
         status_param = self.request.query_params.get('status', None)
         category_param = self.request.query_params.get('category', None)
         location_param = self.request.query_params.get('location', None)
+        location_city_param = self.request.query_params.get('locationCity', None)
         owner_param = self.request.query_params.get('owner', None)
         involved_param = self.request.query_params.get('involved', None)
         available_param = self.request.query_params.get('available', None)
@@ -59,6 +60,11 @@ class TaskViewSet(
             queryset = queryset.filter(category_query)
         if location_param:
             queryset = queryset.filter(location_label__icontains=location_param)
+        if location_city_param:
+            if location_city_param == 'remote':
+                queryset = queryset.filter(location_is_remote=True)
+            else:
+                queryset = queryset.filter(location_city_id=location_city_param)
         if owner_param == 'me':
             queryset = queryset.filter(owner=self.request.user)
         if involved_param == 'me':
@@ -69,6 +75,26 @@ class TaskViewSet(
             queryset = queryset.filter(status='open').exclude(owner=self.request.user)
 
         return queryset
+
+    @action(detail=False, methods=['get'], url_path='location-facets')
+    def location_facets(self, request):
+        queryset = self.get_queryset()
+
+        facets = (
+            queryset.exclude(location_city_id='')
+            .values('location_city_id', 'location_city_label')
+            .annotate(count=Count('id'))
+            .order_by('location_city_label')
+        )
+
+        return Response([
+            {
+                'id': facet['location_city_id'],
+                'label': facet['location_city_label'],
+                'count': facet['count'],
+            }
+            for facet in facets
+        ])
 
     def list(self, request, *args, **kwargs):
         queryset = self.get_queryset()

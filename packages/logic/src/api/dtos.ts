@@ -58,6 +58,9 @@ export interface TaskLocation {
   isRemote: boolean;
   latitude?: number;
   longitude?: number;
+  cityId?: string;
+  cityLabel?: string;
+  countryCode?: string;
 }
 
 export interface Task {
@@ -246,8 +249,21 @@ export interface ListTasksQuery extends PaginationQuery {
   status?: TaskStatus;
   category?: string;
   location?: string;
+  locationCity?: string;
   owner?: "me";
   involved?: "me";
+  available?: boolean;
+}
+
+export interface TaskLocationFacet {
+  id: string;
+  label: string;
+  count: number;
+}
+
+export interface ListTaskLocationFacetsQuery {
+  status?: TaskStatus;
+  category?: string;
   available?: boolean;
 }
 
