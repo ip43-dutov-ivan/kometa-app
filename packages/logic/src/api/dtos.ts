@@ -184,8 +184,6 @@ export type CreateTaskRequest = Pick<
   "title" | "description" | "category" | "location" | "compensation"
 >;
 
-export type UpdateTaskRequest = Partial<CreateTaskRequest>;
-
 export interface RequestCompletionRequest {
   note?: string;
 }

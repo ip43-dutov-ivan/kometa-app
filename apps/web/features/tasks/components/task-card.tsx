@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 
-export function TaskCard({ task }: { task: Task }) {
+export function TaskCard({ task, href }: { task: Task; href?: string }) {
   return (
     <Card className="rounded-lg">
       <CardHeader>
@@ -26,7 +26,7 @@ export function TaskCard({ task }: { task: Task }) {
       </CardContent>
       <CardFooter>
         <Button asChild variant="outline" className="w-full">
-          <Link href={`/app/tasks/${task.id}`}>Open task</Link>
+          <Link href={href ?? `/app/tasks/${task.id}`}>Open task</Link>
         </Button>
       </CardFooter>
     </Card>

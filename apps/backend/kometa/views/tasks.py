@@ -1,9 +1,9 @@
 import logging
 
-from rest_framework import status
+from rest_framework import mixins, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.viewsets import ModelViewSet
+from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
 from django.db.models import Q
 from ..models import Feedback, Task
@@ -20,10 +20,17 @@ LEGACY_TASK_CATEGORY_LABELS = {
 }
 
 
-class TaskViewSet(ModelViewSet):
+class TaskViewSet(
+    mixins.CreateModelMixin,
+    mixins.RetrieveModelMixin,
+    mixins.ListModelMixin,
+    mixins.DestroyModelMixin,
+    GenericViewSet,
+):
     queryset = Task.objects.all()
     serializer_class = TaskSerializer
     permission_classes = [IsAuthenticated]
+    http_method_names = ['get', 'post', 'delete', 'head', 'options']
 
     def perform_create(self, serializer):
         task = serializer.save(owner=self.request.user)
@@ -92,43 +99,42 @@ class TaskViewSet(ModelViewSet):
             },
         })
 
-    def update(self, request, *args, **kwargs):
+    def destroy(self, request, *args, **kwargs):
         task = self.get_object()
         if task.owner != request.user:
             logger.warning(
-                'Task update denied task_id=%s actor_id=%s owner_id=%s reason=not_owner',
+                'Task delete denied task_id=%s actor_id=%s owner_id=%s reason=not_owner',
                 task.id,
                 request.user.id,
                 task.owner_id,
             )
             return Response(
-                {'detail': 'Only the task owner can update this task.'},
+                {'detail': 'Only the task owner can delete this task.'},
                 status=status.HTTP_403_FORBIDDEN
             )
         if task.status != 'open':
             logger.warning(
-                'Task update denied task_id=%s actor_id=%s status=%s reason=invalid_status',
+                'Task delete denied task_id=%s actor_id=%s status=%s reason=invalid_status',
                 task.id,
                 request.user.id,
                 task.status,
             )
             return Response(
-                {'detail': 'Can only update tasks in open status.'},
-                status=status.HTTP_400_BAD_REQUEST
+                {'detail': 'Only open tasks can be deleted.'},
+                status=status.HTTP_409_CONFLICT
             )
 
-        partial = kwargs.pop('partial', False)
-        serializer = self.get_serializer(task, data=request.data, partial=partial)
-        if serializer.is_valid():
-            serializer.save()
-            logger.info(
-                'Task updated task_id=%s owner_id=%s status=%s',
-                task.id,
-                request.user.id,
-                task.status,
-            )
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        declined_count = task.responses.filter(status='pending').update(status='declined')
+        task.status = 'cancelled'
+        task.save(update_fields=['status', 'updated_at'])
+        logger.info(
+            'Task cancelled task_id=%s owner_id=%s declined_responses=%s',
+            task.id,
+            request.user.id,
+            declined_count,
+        )
+        serializer = self.get_serializer(task)
+        return Response(serializer.data)
 
     @action(detail=True, methods=['post'])
     def start(self, request, pk=None):

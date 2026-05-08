@@ -108,7 +108,7 @@ export const taskHandlers = [
     return json(task);
   }),
 
-  http.patch(apiPath("/tasks/:taskId"), async ({ params, request }) => {
+  http.delete(apiPath("/tasks/:taskId"), ({ params }) => {
     const activeUser = requireActiveCurrentUser();
     if (activeUser.response) {
       return activeUser.response;
@@ -121,31 +121,22 @@ export const taskHandlers = [
     }
 
     if (task.ownerId !== currentUserId) {
-      return error("Only the task owner can update this task", "task_update_forbidden", 403);
+      return error("Only the task owner can delete this task", "task_delete_forbidden", 403);
     }
 
     if (task.status !== "open") {
-      return error("Only open tasks can be updated", "task_not_editable", 409);
+      return error("Only open tasks can be deleted", "task_delete_not_allowed", 409);
     }
 
-    const body = await request.json().catch(() => ({}));
-    const input = body as Partial<Task>;
-    const locationResult = input.location ? normalizeTaskLocation(input.location) : null;
+    const timestamp = now();
+    task.status = "cancelled";
+    task.updatedAt = timestamp;
 
-    if (locationResult && "response" in locationResult) {
-      return locationResult.response;
+    for (const response of responses) {
+      if (response.taskId === task.id && response.status === "pending") {
+        response.status = "declined";
+      }
     }
-
-    Object.assign(task, {
-      title: input.title?.trim() || task.title,
-      description: input.description?.trim() || task.description,
-      category: input.category
-        ? normalizeTaskCategory(input.category) || task.category
-        : task.category,
-      location: locationResult?.location ?? task.location,
-      compensation: input.compensation ?? task.compensation,
-      updatedAt: now(),
-    });
 
     return json(task);
   }),

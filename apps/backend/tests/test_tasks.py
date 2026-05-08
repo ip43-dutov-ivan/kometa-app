@@ -1,7 +1,7 @@
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from .factories import create_user, task_payload
+from .factories import create_task, create_user, task_payload
 from .helpers import auth_client
 
 
@@ -52,45 +52,24 @@ class TaskEndpointTests(APITestCase):
         self.assertEqual(location_response.status_code, status.HTTP_200_OK)
         self.assertEqual(location_response.json()['pageInfo']['total'], 1)
 
-    def test_owner_can_update_open_task(self):
-        create_response = self.owner_client.post(
-            '/api/v1/tasks',
-            task_payload(),
-            format='json',
-        )
-        task_id = create_response.json()['id']
+    def test_task_update_methods_are_not_available(self):
+        task = create_task(owner=self.owner)
 
-        update_response = self.owner_client.patch(
-            f'/api/v1/tasks/{task_id}',
+        patch_response = self.owner_client.patch(
+            f'/api/v1/tasks/{task.id}',
             {'title': 'Build a website - Updated'},
             format='json',
         )
-
-        self.assertEqual(update_response.status_code, status.HTTP_200_OK)
-        self.assertEqual(update_response.json()['title'], 'Build a website - Updated')
-
-    def test_owner_can_update_location(self):
-        create_response = self.owner_client.post(
-            '/api/v1/tasks',
-            task_payload(),
-            format='json',
-        )
-        task_id = create_response.json()['id']
-
-        update_response = self.owner_client.patch(
-            f'/api/v1/tasks/{task_id}',
-            {'location': {
-                'label': 'Kyiv, Podil',
-                'isRemote': False,
-                'latitude': 50.465,
-                'longitude': 30.52,
-            }},
+        put_response = self.owner_client.put(
+            f'/api/v1/tasks/{task.id}',
+            task_payload(title='Build a website - Updated'),
             format='json',
         )
 
-        self.assertEqual(update_response.status_code, status.HTTP_200_OK)
-        self.assertEqual(update_response.json()['location']['label'], 'Kyiv, Podil')
-        self.assertEqual(update_response.json()['location']['latitude'], 50.465)
+        self.assertEqual(patch_response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
+        self.assertEqual(put_response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
+        task.refresh_from_db()
+        self.assertNotEqual(task.title, 'Build a website - Updated')
 
     def test_remote_task_does_not_require_coordinates(self):
         create_response = self.owner_client.post(
@@ -126,22 +105,6 @@ class TaskEndpointTests(APITestCase):
 
         self.assertEqual(create_response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('latitude', create_response.json()['location'])
-
-    def test_non_owner_cannot_update_task(self):
-        create_response = self.owner_client.post(
-            '/api/v1/tasks',
-            task_payload(),
-            format='json',
-        )
-        task_id = create_response.json()['id']
-
-        update_response = self.other_client.patch(
-            f'/api/v1/tasks/{task_id}',
-            {'title': 'Hacked'},
-            format='json',
-        )
-
-        self.assertEqual(update_response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_tasks_require_authentication(self):
         response = self.client.get('/api/v1/tasks')

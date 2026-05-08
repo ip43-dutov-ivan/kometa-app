@@ -1,9 +1,11 @@
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 from django.contrib.auth import authenticate
+from django.core.exceptions import ValidationError as DjangoValidationError
 from .models import CompletionRequest, Conversation, ConversationMessage, Feedback, Match, Report, Task, TaskResponse, User
 
 class UserSerializer(serializers.ModelSerializer):
+    id = serializers.CharField(read_only=True)
     completedTasks = serializers.IntegerField(source='completed_tasks', read_only=True)
     accountStatus = serializers.CharField(source='account_status', read_only=True)
     avatarUrl = serializers.URLField(source='avatar_url', allow_blank=True, required=False)
@@ -274,6 +276,20 @@ class ReportSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError({'reportedUserId': 'This field is required.'})
             if 'reason' not in data:
                 raise serializers.ValidationError({'reason': 'This field is required.'})
+
+            request = self.context.get('request')
+            reported_user_id = data.get('reported_user_id')
+            if request and reported_user_id and str(reported_user_id) == str(request.user.id):
+                raise serializers.ValidationError({'reportedUserId': 'Users cannot report themselves.'})
+
+            task_id = data.get('task_id')
+            if task_id:
+                try:
+                    task_exists = Task.objects.filter(id=task_id).exists()
+                except (ValueError, DjangoValidationError):
+                    task_exists = False
+                if not task_exists:
+                    raise serializers.ValidationError({'taskId': 'Task not found.'})
         return data
 
     def create(self, validated_data):

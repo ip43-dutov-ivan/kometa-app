@@ -31,7 +31,10 @@ export function MatchesPage() {
         const response = await kometaApi.matches.list({ activeOnly: true });
         const nextItems = await Promise.all(
           response.items.map(async (match) => {
-            const otherUserId = match.ownerId === user?.id ? match.providerId : match.ownerId;
+            const otherUserId =
+              match.ownerId === (user?.id ? String(user.id) : undefined)
+                ? match.providerId
+                : match.ownerId;
             const [task, otherUser] = await Promise.all([
               kometaApi.tasks.get(match.taskId).catch(() => undefined),
               kometaApi.users.getById(otherUserId).catch(() => undefined),

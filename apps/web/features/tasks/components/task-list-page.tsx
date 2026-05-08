@@ -103,7 +103,7 @@ export function TaskDiscoveryPage() {
       ) : tasks.length ? (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {tasks.map((task) => (
-            <TaskCard key={task.id} task={task} />
+            <TaskCard key={task.id} task={task} href={`/app/tasks/${task.id}`} />
           ))}
         </div>
       ) : (
@@ -124,7 +124,7 @@ export function MyTasksPage() {
       try {
         const response = await kometaApi.tasks.list(buildOwnTasksQuery());
         if (isActive) {
-          setTasks(response.items);
+          setTasks(response.items.filter((task) => task.status !== "cancelled"));
         }
       } catch (caughtError) {
         if (isActive) {
@@ -149,7 +149,10 @@ export function MyTasksPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="font-heading text-3xl font-semibold">My tasks</h1>
-          <p className="mt-2 text-muted-foreground">Track task requests you created.</p>
+          <p className="mt-2 text-muted-foreground">
+            Manage your created tasks. Duplicate a task to revise it, or delete open tasks you no
+            longer need.
+          </p>
         </div>
         <Button asChild>
           <Link href="/app/tasks/new">
@@ -164,7 +167,7 @@ export function MyTasksPage() {
       ) : tasks.length ? (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {tasks.map((task) => (
-            <TaskCard key={task.id} task={task} />
+            <TaskCard key={task.id} task={task} href={`/app/my-tasks/${task.id}`} />
           ))}
         </div>
       ) : (

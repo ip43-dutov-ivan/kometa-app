@@ -152,7 +152,7 @@ export function getTaskLocationLabel(location: TaskLocation): string {
 }
 
 export function isTaskOwner(task: Task, currentUserId: string | null | undefined): boolean {
-  return Boolean(currentUserId && task.ownerId === currentUserId);
+  return Boolean(currentUserId && task.ownerId === String(currentUserId));
 }
 
 export function isTaskCategoryId(value: string | null | undefined): boolean {

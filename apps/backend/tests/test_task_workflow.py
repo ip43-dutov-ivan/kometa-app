@@ -1,7 +1,9 @@
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from .factories import create_user, task_payload
+from kometa.models import TaskResponse
+
+from .factories import create_task, create_user, task_payload
 from .helpers import auth_client
 
 
@@ -195,3 +197,79 @@ class TaskWorkflowTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.json()['pageInfo']['total'], 2)
+
+    def test_task_owner_cannot_respond_to_own_task(self):
+        task = create_task(owner=self.owner)
+
+        response = self.owner_client.post(
+            f'/api/v1/tasks/{task.id}/responses',
+            {'comment': 'I can do my own task'},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_user_cannot_report_self(self):
+        response = self.owner_client.post(
+            '/api/v1/reports',
+            {
+                'reportedUserId': str(self.owner.id),
+                'reason': 'Self report should not be allowed.',
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_report_requires_existing_task_when_task_id_is_supplied(self):
+        response = self.owner_client.post(
+            '/api/v1/reports',
+            {
+                'reportedUserId': str(self.provider1.id),
+                'taskId': '00000000-0000-0000-0000-000000000000',
+                'reason': 'Task does not exist.',
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_owner_can_cancel_open_task_and_pending_responses_are_declined(self):
+        task = create_task(owner=self.owner)
+        task_response = TaskResponse.objects.create(
+            task=task,
+            provider=self.provider1,
+            comment='I can help.',
+        )
+
+        response = self.owner_client.delete(f'/api/v1/tasks/{task.id}')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json()['status'], 'cancelled')
+        task_response.refresh_from_db()
+        self.assertEqual(task_response.status, 'declined')
+
+    def test_non_owner_cannot_cancel_task(self):
+        task = create_task(owner=self.owner)
+
+        response = self.provider1_client.delete(f'/api/v1/tasks/{task.id}')
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_non_open_task_cannot_be_cancelled(self):
+        task = create_task(owner=self.owner, status='matched')
+
+        response = self.owner_client.delete(f'/api/v1/tasks/{task.id}')
+
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+
+    def test_task_update_endpoint_is_not_available(self):
+        task = create_task(owner=self.owner)
+
+        response = self.owner_client.patch(
+            f'/api/v1/tasks/{task.id}',
+            task_payload(title='Updated title'),
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)

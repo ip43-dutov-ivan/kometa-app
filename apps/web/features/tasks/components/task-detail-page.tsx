@@ -2,20 +2,49 @@
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Check, Edit, Flag, MessageSquare, Send, ShieldAlert } from "lucide-react";
+import { useRouter } from "next/navigation";
+import {
+  ArrowLeft,
+  Check,
+  Copy,
+  Flag,
+  MessageSquare,
+  Send,
+  ShieldAlert,
+  Trash2,
+} from "lucide-react";
 import type { Match, Task, User } from "@kometa/logic";
 import { getTaskCategoryLabel, getTaskLocationLabel, isTaskOwner } from "@kometa/logic";
 import { kometaApi } from "@/shared/api/client";
 import { EmptyState, ErrorState, LoadingState } from "@/shared/components/page-state";
 import { useKometaSession } from "@/shared/session/use-kometa-session";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 
-export function TaskDetailPage({ taskId }: { taskId: string }) {
-  const { user } = useKometaSession();
+export function TaskDetailPage({
+  taskId,
+  scope = "discovery",
+}: {
+  taskId: string;
+  scope?: "discovery" | "owned";
+}) {
+  const router = useRouter();
+  const { user, hasHydrated } = useKometaSession();
+  const userId = user?.id ? String(user.id) : undefined;
   const [task, setTask] = useState<Task | null>(null);
   const [match, setMatch] = useState<Match | null>(null);
   const [otherUser, setOtherUser] = useState<User | null>(null);
@@ -26,6 +55,11 @@ export function TaskDetailPage({ taskId }: { taskId: string }) {
   const [isMutating, setIsMutating] = useState(false);
 
   const loadTask = useCallback(async () => {
+    if (!hasHydrated) {
+      return;
+    }
+
+    setIsLoading(true);
     setError(null);
     try {
       const [nextTask, matchesResponse, myResponses] = await Promise.all([
@@ -35,12 +69,16 @@ export function TaskDetailPage({ taskId }: { taskId: string }) {
       ]);
       const nextMatch = matchesResponse.items.find((item) => item.taskId === taskId) ?? null;
       const otherUserId =
-        nextMatch && user
-          ? nextMatch.ownerId === user.id
+        nextMatch && userId
+          ? nextMatch.ownerId === userId
             ? nextMatch.providerId
             : nextMatch.ownerId
-          : nextTask.ownerId;
-      const nextOtherUser = await kometaApi.users.getById(otherUserId).catch(() => null);
+          : nextTask.ownerId === userId
+            ? null
+            : nextTask.ownerId;
+      const nextOtherUser = otherUserId
+        ? await kometaApi.users.getById(otherUserId).catch(() => null)
+        : null;
       setTask(nextTask);
       setMatch(nextMatch);
       setOtherUser(nextOtherUser);
@@ -52,11 +90,25 @@ export function TaskDetailPage({ taskId }: { taskId: string }) {
     } finally {
       setIsLoading(false);
     }
-  }, [taskId, user]);
+  }, [hasHydrated, taskId, user, userId]);
 
   useEffect(() => {
     loadTask();
   }, [loadTask]);
+
+  useEffect(() => {
+    if (!task || !userId) {
+      return;
+    }
+
+    const owner = isTaskOwner(task, userId);
+    if (scope === "discovery" && owner) {
+      router.replace(`/app/my-tasks/${task.id}`);
+    }
+    if (scope === "owned" && !owner) {
+      router.replace(`/app/tasks/${task.id}`);
+    }
+  }, [router, scope, task, userId]);
 
   async function respond(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -77,6 +129,19 @@ export function TaskDetailPage({ taskId }: { taskId: string }) {
 
   async function startTask() {
     await mutateTask(() => kometaApi.tasks.start(taskId));
+  }
+
+  async function cancelTask() {
+    setIsMutating(true);
+    setError(null);
+    try {
+      await kometaApi.tasks.delete(taskId);
+      router.push("/app/my-tasks");
+    } catch (caughtError) {
+      setError(caughtError instanceof Error ? caughtError.message : "Task deletion failed.");
+    } finally {
+      setIsMutating(false);
+    }
   }
 
   async function requestCompletion(event: FormEvent<HTMLFormElement>) {
@@ -154,7 +219,7 @@ export function TaskDetailPage({ taskId }: { taskId: string }) {
     return String(new FormData(form).get("requestId") ?? lastCompletionRequestId).trim();
   }
 
-  if (isLoading) {
+  if (!hasHydrated || isLoading) {
     return <LoadingState label="Loading task" />;
   }
 
@@ -163,17 +228,23 @@ export function TaskDetailPage({ taskId }: { taskId: string }) {
   }
 
   const owner = isTaskOwner(task, user?.id);
-  const reportHref =
-    otherUser && otherUser.id !== user?.id
-      ? `/app/reports/new?reportedUserId=${otherUser.id}&taskId=${task.id}`
-      : `/app/reports/new?reportedUserId=${task.ownerId}&taskId=${task.id}`;
+  const reportedUserId =
+    otherUser && otherUser.id !== userId
+      ? otherUser.id
+      : !owner && task.ownerId !== userId
+        ? task.ownerId
+        : null;
+  const reportHref = reportedUserId
+    ? `/app/reports/new?reportedUserId=${reportedUserId}&taskId=${task.id}`
+    : null;
+  const backHref = scope === "owned" ? "/app/my-tasks" : "/app/tasks";
 
   return (
     <div className="grid gap-5">
       <Button asChild variant="ghost" className="w-fit">
-        <Link href="/app/tasks">
+        <Link href={backHref}>
           <ArrowLeft />
-          Back to discovery
+          {scope === "owned" ? "Back to my tasks" : "Back to discovery"}
         </Link>
       </Button>
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
@@ -210,12 +281,14 @@ export function TaskDetailPage({ taskId }: { taskId: string }) {
           {error ? <ErrorState message={error} /> : null}
           <div className="grid gap-2">
             {renderTaskActions(task, owner)}
-            <Button asChild variant="ghost">
-              <Link href={reportHref}>
-                <ShieldAlert />
-                Report
-              </Link>
-            </Button>
+            {reportHref ? (
+              <Button asChild variant="ghost">
+                <Link href={reportHref}>
+                  <ShieldAlert />
+                  Report
+                </Link>
+              </Button>
+            ) : null}
           </div>
         </aside>
       </div>
@@ -227,9 +300,9 @@ export function TaskDetailPage({ taskId }: { taskId: string }) {
       return isOwner ? (
         <>
           <Button asChild variant="outline">
-            <Link href={`/app/tasks/${activeTask.id}/edit`}>
-              <Edit />
-              Edit task
+            <Link href={`/app/tasks/new?duplicateFrom=${encodeURIComponent(activeTask.id)}`}>
+              <Copy />
+              Duplicate task
             </Link>
           </Button>
           <Button asChild>
@@ -238,15 +311,37 @@ export function TaskDetailPage({ taskId }: { taskId: string }) {
               View responses
             </Link>
           </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="destructive" disabled={isMutating}>
+                <Trash2 />
+                Delete task
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete this task?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This cancels the task and declines pending responses. The task history is kept.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={cancelTask}>Delete task</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </>
       ) : (
-        <form className="grid gap-2" onSubmit={respond}>
-          <Textarea name="comment" rows={4} placeholder="How can you help?" required />
-          <Button type="submit" disabled={isMutating || Boolean(submittedResponse)}>
-            <Send />
-            {submittedResponse ? `Response ${submittedResponse}` : "Respond"}
-          </Button>
-        </form>
+        user && (
+          <form className="grid gap-2" onSubmit={respond}>
+            <Textarea name="comment" rows={4} placeholder="How can you help?" required />
+            <Button type="submit" disabled={isMutating || Boolean(submittedResponse)}>
+              <Send />
+              {submittedResponse ? `Response ${submittedResponse}` : "Respond"}
+            </Button>
+          </form>
+        )
       );
     }
 

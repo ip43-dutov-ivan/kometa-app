@@ -6,7 +6,6 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   ClipboardList,
   Compass,
-  Home,
   Inbox,
   LogOut,
   Menu,
@@ -30,7 +29,6 @@ import {
 import { cn } from "@/lib/utils";
 
 const primaryNavItems = [
-  { href: "/app", label: "Home", icon: Home },
   { href: "/app/tasks", label: "Discover", icon: Compass },
   { href: "/app/my-tasks", label: "My tasks", icon: ClipboardList },
   { href: "/app/conversations", label: "Chat", icon: MessageSquare },
@@ -68,9 +66,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   }
 
   function isActive(href: string) {
-    return href === "/app"
-      ? pathname === href
-      : pathname === href || pathname.startsWith(`${href}/`);
+    return pathname === href || pathname.startsWith(`${href}/`);
   }
 
   const allDesktopNavItems = [...primaryNavItems, ...secondaryNavItems];
@@ -80,7 +76,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     <div className="min-h-screen bg-background lg:grid lg:grid-cols-[240px_1fr]">
       <aside className="sticky top-0 hidden h-screen border-r bg-background/95 lg:flex lg:flex-col">
         <div className="flex h-16 items-center border-b px-5">
-          <Link href="/app" className="font-heading text-xl font-semibold">
+          <Link href="/app/tasks" className="font-heading text-xl font-semibold">
             Kometa
           </Link>
         </div>
@@ -113,7 +109,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <div className="min-w-0">
         <header className="sticky top-0 z-20 border-b bg-background/95 backdrop-blur lg:hidden">
           <div className="flex min-h-14 items-center justify-between gap-3 px-4">
-            <Link href="/app" className="font-heading text-lg font-semibold">
+            <Link href="/app/tasks" className="font-heading text-lg font-semibold">
               Kometa
             </Link>
             <span className="max-w-44 truncate text-sm text-muted-foreground">{user?.name}</span>
@@ -123,7 +119,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <main className="mx-auto w-full max-w-6xl px-4 py-6 pb-24 lg:pb-6">{children}</main>
 
         <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
-          <nav className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t bg-background/95 px-1 pb-[max(0.375rem,env(safe-area-inset-bottom))] pt-1 backdrop-blur lg:hidden">
+          <nav className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-4 border-t bg-background/95 px-1 pb-[max(0.375rem,env(safe-area-inset-bottom))] pt-1 backdrop-blur lg:hidden">
             {primaryNavItems.map((item) => (
               <Button
                 key={item.href}

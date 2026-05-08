@@ -1,12 +1,13 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 import type { TaskLocation } from "@kometa/logic";
-import { toCreateTaskRequest } from "@kometa/logic";
+import { normalizeTaskCategoryId, toCreateTaskRequest } from "@kometa/logic";
 import { kometaApi } from "@/shared/api/client";
-import { ErrorState } from "@/shared/components/page-state";
+import { ErrorState, LoadingState } from "@/shared/components/page-state";
+import { useKometaSession } from "@/shared/session/use-kometa-session";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -20,12 +21,69 @@ const EMPTY_TASK_LOCATION: TaskLocation = {
   isRemote: false,
 };
 
-export function CreateTaskPage() {
+export function CreateTaskPage({ duplicateFrom }: { duplicateFrom?: string }) {
   const router = useRouter();
+  const { user, hasHydrated } = useKometaSession();
+  const userId = user?.id ? String(user.id) : undefined;
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
   const [category, setCategory] = useState("");
   const [location, setLocation] = useState<TaskLocation>(EMPTY_TASK_LOCATION);
+  const [amount, setAmount] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [isLoadingDuplicate, setIsLoadingDuplicate] = useState(Boolean(duplicateFrom));
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!duplicateFrom) {
+      setIsLoadingDuplicate(false);
+      return;
+    }
+
+    if (!hasHydrated) {
+      return;
+    }
+
+    let isActive = true;
+    const sourceTaskId = duplicateFrom;
+
+    async function loadSourceTask() {
+      setIsLoadingDuplicate(true);
+      setError(null);
+      try {
+        const sourceTask = await kometaApi.tasks.get(sourceTaskId);
+
+        if (!isActive) {
+          return;
+        }
+
+        if (!userId || sourceTask.ownerId !== userId) {
+          setError("Only the task owner can duplicate this task.");
+          return;
+        }
+
+        setTitle(sourceTask.title);
+        setDescription(sourceTask.description);
+        setCategory(normalizeTaskCategoryId(sourceTask.category));
+        setLocation(sourceTask.location);
+        setAmount(String(sourceTask.compensation.amount));
+      } catch (caughtError) {
+        if (isActive) {
+          setError(caughtError instanceof Error ? caughtError.message : "Task failed to load.");
+        }
+      } finally {
+        if (isActive) {
+          setIsLoadingDuplicate(false);
+        }
+      }
+    }
+
+    loadSourceTask();
+
+    return () => {
+      isActive = false;
+    };
+  }, [duplicateFrom, hasHydrated, userId]);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -43,18 +101,17 @@ export function CreateTaskPage() {
 
     setIsSubmitting(true);
 
-    const formData = new FormData(event.currentTarget);
     const request = toCreateTaskRequest({
-      title: String(formData.get("title") ?? ""),
-      description: String(formData.get("description") ?? ""),
-      category: String(formData.get("category") ?? ""),
+      title,
+      description,
+      category,
       location,
-      amount: Number(formData.get("amount") ?? 0),
+      amount: Number(amount),
     });
 
     try {
       const task = await kometaApi.tasks.create(request);
-      router.push(`/app/tasks/${task.id}`);
+      router.push(`/app/my-tasks/${task.id}`);
     } catch (caughtError) {
       setError(caughtError instanceof Error ? caughtError.message : "Task creation failed.");
     } finally {
@@ -62,12 +119,22 @@ export function CreateTaskPage() {
     }
   }
 
+  if (isLoadingDuplicate) {
+    return <LoadingState label="Loading task" />;
+  }
+
+  const isDuplicate = Boolean(duplicateFrom);
+
   return (
     <div className="mx-auto grid max-w-2xl gap-5">
       <div>
-        <h1 className="font-heading text-3xl font-semibold">Create task</h1>
+        <h1 className="font-heading text-3xl font-semibold">
+          {isDuplicate ? "Duplicate task" : "Create task"}
+        </h1>
         <p className="mt-2 text-muted-foreground">
-          Describe the help you need and set compensation.
+          {isDuplicate
+            ? "Review the copied details and publish a new task."
+            : "Describe the help you need and set compensation."}
         </p>
       </div>
       <Card className="rounded-lg">
@@ -80,11 +147,24 @@ export function CreateTaskPage() {
             {error ? <ErrorState message={error} /> : null}
             <div className="grid gap-2">
               <Label htmlFor="title">Title</Label>
-              <Input id="title" name="title" required />
+              <Input
+                id="title"
+                name="title"
+                value={title}
+                onChange={(event) => setTitle(event.target.value)}
+                required
+              />
             </div>
             <div className="grid gap-2">
               <Label htmlFor="description">Description</Label>
-              <Textarea id="description" name="description" rows={5} required />
+              <Textarea
+                id="description"
+                name="description"
+                rows={5}
+                value={description}
+                onChange={(event) => setDescription(event.target.value)}
+                required
+              />
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="grid gap-2">
@@ -93,7 +173,16 @@ export function CreateTaskPage() {
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="amount">Compensation, UAH</Label>
-                <Input id="amount" name="amount" type="number" min="0" step="1" required />
+                <Input
+                  id="amount"
+                  name="amount"
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={amount}
+                  onChange={(event) => setAmount(event.target.value)}
+                  required
+                />
               </div>
             </div>
             <div className="grid gap-2">

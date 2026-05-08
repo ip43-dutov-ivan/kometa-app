@@ -37,7 +37,6 @@ import type {
   UnblockUserResponse,
   UpdateCurrentUserRequest,
   UpdateReportRequest,
-  UpdateTaskRequest,
   User,
   UserFeedbackQuery,
   UserId,
@@ -103,11 +102,7 @@ export interface KometaApiClient {
     list: (query?: ListTasksQuery, options?: KometaRequestOptions) => Promise<ListResponse<Task>>;
     create: (body: CreateTaskRequest, options?: KometaRequestOptions) => Promise<Task>;
     get: (taskId: TaskId, options?: KometaRequestOptions) => Promise<Task>;
-    update: (
-      taskId: TaskId,
-      body: UpdateTaskRequest,
-      options?: KometaRequestOptions,
-    ) => Promise<Task>;
+    delete: (taskId: TaskId, options?: KometaRequestOptions) => Promise<Task>;
     start: (taskId: TaskId, options?: KometaRequestOptions) => Promise<Task>;
     requestCompletion: (
       taskId: TaskId,
@@ -269,6 +264,8 @@ export function createKometaApiClient(options: KometaApiClientOptions = {}): Kom
     body: unknown,
     options?: KometaRequestOptions,
   ): Promise<TResponse> => request<TResponse>(path, withJsonBody("PATCH", body), options);
+  const del = <TResponse>(path: string, options?: KometaRequestOptions): Promise<TResponse> =>
+    request<TResponse>(path, { method: "DELETE" }, options);
 
   return {
     auth: {
@@ -288,7 +285,7 @@ export function createKometaApiClient(options: KometaApiClientOptions = {}): Kom
       list: (query, options) => get<ListResponse<Task>>("/tasks", query, options),
       create: (body, options) => post<Task>("/tasks", body, options),
       get: (taskId, options) => get<Task>(`/tasks/${segment(taskId)}`, undefined, options),
-      update: (taskId, body, options) => patch<Task>(`/tasks/${segment(taskId)}`, body, options),
+      delete: (taskId, options) => del<Task>(`/tasks/${segment(taskId)}`, options),
       start: (taskId, options) => post<Task>(`/tasks/${segment(taskId)}/start`, undefined, options),
       requestCompletion: (taskId, body, options) =>
         post<CompletionMutationResponse>(
