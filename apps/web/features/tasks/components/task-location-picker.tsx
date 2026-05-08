@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ComponentProps } from "react";
 import { Geocoder } from "@mapbox/search-js-react";
 import mapboxgl from "mapbox-gl";
+import { useTheme } from "next-themes";
 import type { TaskLocation } from "@kometa/logic";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,6 +12,10 @@ import { Switch } from "@/components/ui/switch";
 
 const KYIV_CENTER = { latitude: 50.4501, longitude: 30.5234 };
 const MAPBOX_ACCESS_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN ?? "";
+const MAPBOX_STYLES = {
+  light: "mapbox://styles/mapbox/light-v11",
+  dark: "mapbox://styles/mapbox/dark-v11",
+} as const;
 
 interface TaskLocationPickerProps {
   value: TaskLocation;
@@ -22,6 +27,7 @@ type GeocoderComponentProps = ComponentProps<typeof Geocoder>;
 type GeocoderFeature = Parameters<NonNullable<GeocoderComponentProps["onRetrieve"]>>[0];
 
 export function TaskLocationPicker({ value, onChange, disabled = false }: TaskLocationPickerProps) {
+  const { resolvedTheme } = useTheme();
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const markerRef = useRef<mapboxgl.Marker | null>(null);
@@ -29,6 +35,11 @@ export function TaskLocationPicker({ value, onChange, disabled = false }: TaskLo
   const disabledRef = useRef(disabled);
   const onChangeRef = useRef(onChange);
   const [hasLoadedMap, setHasLoadedMap] = useState(!value.isRemote);
+  const mapTheme = resolvedTheme === "light" ? "light" : "dark";
+  const geocoderTheme = useMemo(() => getGeocoderTheme(mapTheme), [mapTheme]);
+  const mapThemeRef = useRef<keyof typeof MAPBOX_STYLES>(mapTheme);
+
+  mapThemeRef.current = mapTheme;
 
   const setPhysicalLocation = useCallback((latitude: number, longitude: number, label: string) => {
     onChangeRef.current({
@@ -68,7 +79,7 @@ export function TaskLocationPicker({ value, onChange, disabled = false }: TaskLo
 
     const map = new mapboxgl.Map({
       container: mapContainerRef.current,
-      style: "mapbox://styles/mapbox/dark-v11",
+      style: MAPBOX_STYLES[mapThemeRef.current],
       center: [initialCenter.longitude, initialCenter.latitude],
       zoom: initialLocation.latitude && initialLocation.longitude ? 13 : 11,
     });
@@ -91,6 +102,10 @@ export function TaskLocationPicker({ value, onChange, disabled = false }: TaskLo
       mapRef.current = null;
     };
   }, [hasLoadedMap, setPhysicalLocation]);
+
+  useEffect(() => {
+    mapRef.current?.setStyle(MAPBOX_STYLES[mapTheme]);
+  }, [mapTheme]);
 
   useEffect(() => {
     if (!value.isRemote) {
@@ -150,78 +165,6 @@ export function TaskLocationPicker({ value, onChange, disabled = false }: TaskLo
 
     setPhysicalLocation(latitude, longitude, label);
   }
-
-  const geocoderTheme: GeocoderComponentProps["theme"] = {
-    variables: {
-      borderRadius: "0.5rem",
-      border: "1px solid hsl(240 3.7% 15.9%)",
-      boxShadow: "0 12px 30px rgb(0 0 0 / 0.35)",
-      colorBackground: "hsl(240 10% 3.9%)",
-      colorBackgroundActive: "hsl(240 3.7% 18%)",
-      colorBackgroundHover: "hsl(240 3.7% 15.9%)",
-      colorPrimary: "hsl(142.1 76.2% 36.3%)",
-      colorSecondary: "hsl(240 5% 64.9%)",
-      colorText: "hsl(0 0% 98%)",
-      fontFamily: 'var(--font-inter), "Inter", ui-sans-serif, system-ui, sans-serif',
-      minWidth: "0",
-    },
-    cssText: `
-      .Input,
-      .Input:focus {
-        box-sizing: border-box !important;
-        color: hsl(0 0% 98%) !important;
-        max-width: 100% !important;
-      }
-
-      .MapboxSearch,
-      .Geocoder,
-      .Results {
-        box-sizing: border-box !important;
-        max-width: 100% !important;
-        width: 100% !important;
-      }
-
-      .Results {
-        max-width: min(var(--width), calc(100vw - 2rem)) !important;
-        overflow-x: hidden !important;
-      }
-
-      .SuggestionText {
-        min-width: 0 !important;
-      }
-
-      .SuggestionName,
-      .SuggestionDesc {
-        overflow: hidden !important;
-        text-overflow: ellipsis !important;
-        white-space: nowrap !important;
-      }
-
-      .Input::placeholder {
-        color: hsl(240 5% 64.9%) !important;
-        opacity: 1;
-      }
-
-      .SearchIcon,
-      .ActionIcon {
-        color: hsl(240 5% 64.9%) !important;
-        fill: hsl(240 5% 64.9%) !important;
-      }
-
-      .Suggestion,
-      .SuggestionName,
-      .SuggestionDesc,
-      .ResultsAttribution {
-        color: hsl(0 0% 98%) !important;
-      }
-
-      .SuggestionDesc,
-      .ResultsAttribution,
-      .ResultsAttribution a {
-        color: hsl(240 5% 64.9%) !important;
-      }
-    `,
-  };
 
   return (
     <div className="grid min-w-0 max-w-full gap-3 overflow-hidden">
@@ -333,4 +276,101 @@ function getLocationCenter(location: TaskLocation): { latitude: number; longitud
   }
 
   return KYIV_CENTER;
+}
+
+function getGeocoderTheme(theme: keyof typeof MAPBOX_STYLES): GeocoderComponentProps["theme"] {
+  const colors =
+    theme === "light"
+      ? {
+          border: "oklch(0.88 0.008 250)",
+          shadow: "0 12px 30px rgb(15 23 42 / 0.12)",
+          background: "oklch(1 0 0)",
+          active: "oklch(0.94 0.006 250)",
+          hover: "oklch(0.96 0.005 250)",
+          primary: "oklch(0.58 0.15 195)",
+          secondary: "oklch(0.48 0.01 270)",
+          text: "oklch(0.16 0.01 270)",
+        }
+      : {
+          border: "oklch(0.22 0.01 270)",
+          shadow: "0 12px 30px rgb(0 0 0 / 0.35)",
+          background: "oklch(0.09 0.01 270)",
+          active: "oklch(0.18 0.01 270)",
+          hover: "oklch(0.16 0.01 270)",
+          primary: "oklch(0.75 0.18 195)",
+          secondary: "oklch(0.55 0 0)",
+          text: "oklch(0.98 0 0)",
+        };
+
+  return {
+    variables: {
+      borderRadius: "0.5rem",
+      border: `1px solid ${colors.border}`,
+      boxShadow: colors.shadow,
+      colorBackground: colors.background,
+      colorBackgroundActive: colors.active,
+      colorBackgroundHover: colors.hover,
+      colorPrimary: colors.primary,
+      colorSecondary: colors.secondary,
+      colorText: colors.text,
+      fontFamily: 'var(--font-inter), "Inter", ui-sans-serif, system-ui, sans-serif',
+      minWidth: "0",
+    },
+    cssText: `
+      .Input,
+      .Input:focus {
+        box-sizing: border-box !important;
+        color: ${colors.text} !important;
+        max-width: 100% !important;
+      }
+
+      .MapboxSearch,
+      .Geocoder,
+      .Results {
+        box-sizing: border-box !important;
+        max-width: 100% !important;
+        width: 100% !important;
+      }
+
+      .Results {
+        max-width: min(var(--width), calc(100vw - 2rem)) !important;
+        overflow-x: hidden !important;
+      }
+
+      .SuggestionText {
+        min-width: 0 !important;
+      }
+
+      .SuggestionName,
+      .SuggestionDesc {
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+      }
+
+      .Input::placeholder {
+        color: ${colors.secondary} !important;
+        opacity: 1;
+      }
+
+      .SearchIcon,
+      .ActionIcon {
+        color: ${colors.secondary} !important;
+        fill: ${colors.secondary} !important;
+      }
+
+      .Suggestion,
+      .SuggestionName,
+      .SuggestionDesc,
+      .ResultsAttribution {
+        color: ${colors.text} !important;
+      }
+
+      .SuggestionDesc,
+      .ResultsAttribution,
+      .ResultsAttribution a {
+        color: ${colors.secondary} !important;
+      }
+    `,
+  };
 }

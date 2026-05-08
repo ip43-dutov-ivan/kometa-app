@@ -10,13 +10,17 @@ import {
   LogOut,
   Menu,
   MessageSquare,
+  Moon,
+  Sun,
   UserRound,
   UsersRound,
 } from "lucide-react";
+import { useTheme } from "next-themes";
 import { kometaApi } from "@/shared/api/client";
 import { LoadingState } from "@/shared/components/page-state";
 import { useKometaSession } from "@/shared/session/use-kometa-session";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 import {
   Sheet,
   SheetClose,
@@ -26,6 +30,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 
 const primaryNavItems = [
@@ -96,6 +101,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           ))}
         </nav>
         <div className="border-t p-3">
+          <ThemeSwitch id="desktop-theme-switch" className="mb-3" />
           <div className="mb-3 min-w-0 px-3">
             <div className="truncate text-sm font-medium">{user?.name}</div>
           </div>
@@ -156,6 +162,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               <SheetDescription>More places and account actions.</SheetDescription>
             </SheetHeader>
             <div className="grid gap-2 px-4">
+              <ThemeSwitch id="mobile-theme-switch" className="mb-1" />
               {secondaryNavItems.map((item) => (
                 <SheetClose key={item.href} asChild>
                   <Button
@@ -178,6 +185,37 @@ export function AppShell({ children }: { children: ReactNode }) {
           </SheetContent>
         </Sheet>
       </div>
+    </div>
+  );
+}
+
+function ThemeSwitch({ id, className }: { id: string; className?: string }) {
+  const { resolvedTheme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const isDark = mounted ? resolvedTheme === "dark" : true;
+
+  return (
+    <div
+      className={cn(
+        "flex h-11 items-center justify-between gap-3 rounded-md border bg-background px-3",
+        className,
+      )}
+    >
+      <Label htmlFor={id} className="min-w-0 gap-2">
+        {isDark ? <Moon className="size-4" /> : <Sun className="size-4" />}
+        <span className="truncate">{isDark ? "Dark" : "Light"} theme</span>
+      </Label>
+      <Switch
+        id={id}
+        checked={isDark}
+        aria-label="Toggle dark theme"
+        onCheckedChange={(checked) => setTheme(checked ? "dark" : "light")}
+      />
     </div>
   );
 }
