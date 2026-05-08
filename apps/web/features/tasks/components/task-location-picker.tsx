@@ -16,6 +16,8 @@ const MAPBOX_STYLES = {
   light: "mapbox://styles/mapbox/light-v11",
   dark: "mapbox://styles/mapbox/dark-v11",
 } as const;
+const MAPBOX_LANGUAGE = "uk";
+const PINNED_LOCATION_LABEL = "Закріплена локація";
 
 interface TaskLocationPickerProps {
   value: TaskLocation;
@@ -25,6 +27,16 @@ interface TaskLocationPickerProps {
 
 type GeocoderComponentProps = ComponentProps<typeof Geocoder>;
 type GeocoderFeature = Parameters<NonNullable<GeocoderComponentProps["onRetrieve"]>>[0];
+type ReverseGeocodeResponse = {
+  features?: Array<{
+    properties?: {
+      full_address?: string;
+      name_preferred?: string;
+      place_formatted?: string;
+      name?: string;
+    };
+  }>;
+};
 
 export function TaskLocationPicker({ value, onChange, disabled = false }: TaskLocationPickerProps) {
   const { resolvedTheme } = useTheme();
@@ -34,6 +46,7 @@ export function TaskLocationPicker({ value, onChange, disabled = false }: TaskLo
   const latestValueRef = useRef(value);
   const disabledRef = useRef(disabled);
   const onChangeRef = useRef(onChange);
+  const reverseGeocodeRequestRef = useRef(0);
   const [hasLoadedMap, setHasLoadedMap] = useState(!value.isRemote);
   const mapTheme = resolvedTheme === "light" ? "light" : "dark";
   const geocoderTheme = useMemo(() => getGeocoderTheme(mapTheme), [mapTheme]);
@@ -43,12 +56,26 @@ export function TaskLocationPicker({ value, onChange, disabled = false }: TaskLo
 
   const setPhysicalLocation = useCallback((latitude: number, longitude: number, label: string) => {
     onChangeRef.current({
-      label: label.trim() || "Pinned location",
+      label: label.trim() || PINNED_LOCATION_LABEL,
       isRemote: false,
       latitude,
       longitude,
     });
   }, []);
+
+  const setPinnedPhysicalLocation = useCallback(
+    async (latitude: number, longitude: number) => {
+      const requestId = reverseGeocodeRequestRef.current + 1;
+      reverseGeocodeRequestRef.current = requestId;
+      setPhysicalLocation(latitude, longitude, PINNED_LOCATION_LABEL);
+
+      const label = await reverseGeocodeLocation(latitude, longitude);
+      if (requestId === reverseGeocodeRequestRef.current && label) {
+        setPhysicalLocation(latitude, longitude, label);
+      }
+    },
+    [setPhysicalLocation],
+  );
 
   useEffect(() => {
     latestValueRef.current = value;
@@ -90,7 +117,7 @@ export function TaskLocationPicker({ value, onChange, disabled = false }: TaskLo
         return;
       }
 
-      setPhysicalLocation(event.lngLat.lat, event.lngLat.lng, latestValueRef.current.label);
+      void setPinnedPhysicalLocation(event.lngLat.lat, event.lngLat.lng);
     });
 
     mapRef.current = map;
@@ -101,7 +128,7 @@ export function TaskLocationPicker({ value, onChange, disabled = false }: TaskLo
       map.remove();
       mapRef.current = null;
     };
-  }, [hasLoadedMap, setPhysicalLocation]);
+  }, [hasLoadedMap, setPinnedPhysicalLocation]);
 
   useEffect(() => {
     mapRef.current?.setStyle(MAPBOX_STYLES[mapTheme]);
@@ -129,7 +156,7 @@ export function TaskLocationPicker({ value, onChange, disabled = false }: TaskLo
       markerRef.current.on("dragend", () => {
         const nextPosition = markerRef.current?.getLngLat();
         if (nextPosition) {
-          setPhysicalLocation(nextPosition.lat, nextPosition.lng, latestValueRef.current.label);
+          void setPinnedPhysicalLocation(nextPosition.lat, nextPosition.lng);
         }
       });
     } else {
@@ -137,7 +164,7 @@ export function TaskLocationPicker({ value, onChange, disabled = false }: TaskLo
     }
 
     map.easeTo({ center: coordinates, zoom: Math.max(map.getZoom(), 13) });
-  }, [setPhysicalLocation, value]);
+  }, [setPinnedPhysicalLocation, value]);
 
   function onRemoteChange(isRemote: boolean) {
     if (isRemote) {
@@ -156,14 +183,8 @@ export function TaskLocationPicker({ value, onChange, disabled = false }: TaskLo
   function onRetrieve(feature: GeocoderFeature) {
     const latitude = feature.properties.coordinates.latitude;
     const longitude = feature.properties.coordinates.longitude;
-    const label =
-      feature.properties.full_address ||
-      [feature.properties.name_preferred, feature.properties.place_formatted]
-        .filter(Boolean)
-        .join(", ") ||
-      feature.properties.name;
 
-    setPhysicalLocation(latitude, longitude, label);
+    setPhysicalLocation(latitude, longitude, getFeatureLabel(feature.properties));
   }
 
   return (
@@ -190,7 +211,7 @@ export function TaskLocationPicker({ value, onChange, disabled = false }: TaskLo
               onRetrieve={onRetrieve}
               options={{
                 country: "ua",
-                language: "en",
+                language: MAPBOX_LANGUAGE,
                 proximity: {
                   lat: KYIV_CENTER.latitude,
                   lng: KYIV_CENTER.longitude,
@@ -267,6 +288,51 @@ export function TaskLocationPicker({ value, onChange, disabled = false }: TaskLo
         ) : null}
       </div>
     </div>
+  );
+}
+
+async function reverseGeocodeLocation(latitude: number, longitude: number): Promise<string> {
+  if (!MAPBOX_ACCESS_TOKEN) {
+    return "";
+  }
+
+  try {
+    const searchParams = new URLSearchParams({
+      access_token: MAPBOX_ACCESS_TOKEN,
+      country: "ua",
+      language: MAPBOX_LANGUAGE,
+      latitude: String(latitude),
+      limit: "1",
+      longitude: String(longitude),
+    });
+    const response = await fetch(
+      `https://api.mapbox.com/search/geocode/v6/reverse?${searchParams.toString()}`,
+    );
+
+    if (!response.ok) {
+      return "";
+    }
+
+    const data = (await response.json()) as ReverseGeocodeResponse;
+    const properties = data.features?.[0]?.properties;
+
+    return properties ? getFeatureLabel(properties) : "";
+  } catch {
+    return "";
+  }
+}
+
+function getFeatureLabel(properties: {
+  full_address?: string;
+  name_preferred?: string;
+  place_formatted?: string;
+  name?: string;
+}): string {
+  return (
+    properties.full_address ||
+    [properties.name_preferred, properties.place_formatted].filter(Boolean).join(", ") ||
+    properties.name ||
+    ""
   );
 }
 
