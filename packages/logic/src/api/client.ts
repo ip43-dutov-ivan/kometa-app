@@ -97,6 +97,7 @@ export interface KometaApiClient {
     getMe: (options?: KometaRequestOptions) => Promise<User>;
     updateMe: (body: UpdateCurrentUserRequest, options?: KometaRequestOptions) => Promise<User>;
     uploadAvatar: (file: File, options?: KometaRequestOptions) => Promise<User>;
+    deleteMe: (options?: KometaRequestOptions) => Promise<void>;
     getById: (userId: UserId, options?: KometaRequestOptions) => Promise<User>;
     listFeedback: (
       userId: UserId,
@@ -341,6 +342,7 @@ export function createKometaApiClient(options: KometaApiClientOptions = {}): Kom
         formData.append("file", file);
         return postFormData<User>("/users/upload-avatar", formData, options);
       },
+      deleteMe: (options) => del<void>("/users/me", options),
       getById: (userId, options) => get<User>(`/users/${segment(userId)}`, undefined, options),
       listFeedback: (userId, query, options) =>
         get<ListResponse<Feedback>>(`/users/${segment(userId)}/feedback`, query, options),

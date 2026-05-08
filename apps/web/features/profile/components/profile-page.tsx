@@ -1,15 +1,28 @@
 "use client";
 
 import { FormEvent, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Loader2, Pencil, Save, ShieldAlert, Star } from "lucide-react";
+import { Loader2, Pencil, Save, ShieldAlert, Star, Trash2 } from "lucide-react";
 import { t } from "@kometa/i18n";
-import { createUnresolvedPhysicalTaskLocation, toUpdateCurrentUserRequest } from "@kometa/logic";
+import { createUnresolvedPhysicalTaskLocation } from "@kometa/logic";
 import type { TaskLocation, User } from "@kometa/logic";
 import { kometaApi } from "@/shared/api/client";
 import { ErrorState, LoadingState } from "@/shared/components/page-state";
 import { LocationPicker } from "@/shared/components/location-picker";
+import { SkillsPicker } from "@/shared/components/skills-picker";
 import { useKometaSession } from "@/shared/session/use-kometa-session";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -19,7 +32,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
 export function ProfilePage() {
-  const { user, setUser } = useKometaSession();
+  const router = useRouter();
+  const { user, setUser, clearSession } = useKometaSession();
   const [profile, setProfile] = useState<User | null>(user);
   const [locationValue, setLocationValue] = useState<TaskLocation>(() =>
     createUnresolvedPhysicalTaskLocation(user?.location ?? ""),
@@ -29,6 +43,9 @@ export function ProfilePage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [avatarError, setAvatarError] = useState<string | null>(null);
+  const [skillsValue, setSkillsValue] = useState<string[]>(user?.skills ?? []);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -41,6 +58,7 @@ export function ProfilePage() {
           setProfile(nextProfile);
           setUser(nextProfile);
           setLocationValue(createUnresolvedPhysicalTaskLocation(nextProfile.location));
+          setSkillsValue(nextProfile.skills);
         }
       } catch (caughtError) {
         if (isActive) {
@@ -80,19 +98,33 @@ export function ProfilePage() {
     }
   }
 
+  async function handleDeleteAccount() {
+    setDeleteError(null);
+    setIsDeletingAccount(true);
+    try {
+      await kometaApi.users.deleteMe();
+      clearSession();
+      router.push("/");
+    } catch (caughtError) {
+      setDeleteError(
+        caughtError instanceof Error ? caughtError.message : t("Account deletion failed."),
+      );
+      setIsDeletingAccount(false);
+    }
+  }
+
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
     setIsSubmitting(true);
 
     const formData = new FormData(event.currentTarget);
-    const request = toUpdateCurrentUserRequest({
-      name: String(formData.get("name") ?? ""),
+    const request = {
+      name: String(formData.get("name") ?? "").trim(),
       location: locationValue.label,
-      bio: String(formData.get("bio") ?? ""),
-      skills: String(formData.get("skills") ?? ""),
-      interests: String(formData.get("interests") ?? ""),
-    });
+      bio: String(formData.get("bio") ?? "").trim(),
+      skills: skillsValue,
+    };
 
     try {
       const nextProfile = await kometaApi.users.updateMe(request);
@@ -132,7 +164,7 @@ export function ProfilePage() {
         <Card className="rounded-lg">
           <CardHeader>
             <CardTitle>{t("Edit profile")}</CardTitle>
-            <CardDescription>{t("Skills and interests are comma-separated.")}</CardDescription>
+            <CardDescription>{t("Search or add your own skills.")}</CardDescription>
           </CardHeader>
           <CardContent>
             <form className="grid gap-4" onSubmit={onSubmit}>
@@ -190,15 +222,11 @@ export function ProfilePage() {
                 <Textarea id="bio" name="bio" rows={5} defaultValue={profile.bio} required />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="skills">{t("Skills")}</Label>
-                <Input id="skills" name="skills" defaultValue={profile.skills.join(", ")} />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="interests">{t("Interests")}</Label>
-                <Input
-                  id="interests"
-                  name="interests"
-                  defaultValue={profile.interests.join(", ")}
+                <Label>{t("Skills")}</Label>
+                <SkillsPicker
+                  value={skillsValue}
+                  onChange={setSkillsValue}
+                  disabled={isSubmitting}
                 />
               </div>
               <Button type="submit" disabled={isSubmitting}>
@@ -206,6 +234,46 @@ export function ProfilePage() {
                 {isSubmitting ? t("Saving") : t("Save profile")}
               </Button>
             </form>
+          </CardContent>
+        </Card>
+        <Card className="rounded-lg border-destructive mt-6">
+          <CardHeader>
+            <CardTitle className="text-destructive">{t("Delete account")}</CardTitle>
+            <CardDescription>
+              {t(
+                "This action is permanent and cannot be undone. All your data including tasks, responses, messages, and profile photo will be deleted immediately.",
+              )}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-3">
+            {deleteError ? <ErrorState message={deleteError} /> : null}
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" disabled={isDeletingAccount}>
+                  <Trash2 />
+                  {isDeletingAccount ? t("Deleting") : t("Delete my account")}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>{t("Delete your account?")}</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    {t(
+                      "This action is permanent and cannot be undone. All your data including tasks, responses, messages, and profile photo will be deleted immediately.",
+                    )}
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>{t("Cancel")}</AlertDialogCancel>
+                  <AlertDialogAction
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    onClick={handleDeleteAccount}
+                  >
+                    {t("Delete my account")}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </CardContent>
         </Card>
       </section>

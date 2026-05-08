@@ -20,11 +20,34 @@ class UserViewSet(ModelViewSet):
     serializer_class = UserSerializer
     permission_classes = [IsAuthenticated]
 
-    @action(detail=False, methods=['get', 'patch'])
+    @action(detail=False, methods=['get', 'patch', 'delete'])
     def me(self, request):
         if request.method == 'GET':
             serializer = UserSerializer(request.user)
             return Response(serializer.data)
+
+        if request.method == 'DELETE':
+            user = request.user
+            user_id = user.id
+
+            avatar_url = user.avatar_url
+            if avatar_url:
+                try:
+                    from urllib.parse import urlparse
+                    parsed = urlparse(avatar_url)
+                    url_path = parsed.path
+                    media_url = settings.MEDIA_URL.rstrip('/')
+                    if url_path.startswith(media_url):
+                        relative = url_path[len(media_url):].lstrip('/')
+                        file_path = os.path.join(settings.MEDIA_ROOT, relative)
+                        if os.path.isfile(file_path):
+                            os.remove(file_path)
+                except Exception:
+                    logger.warning('Failed to delete avatar file for user_id=%s', user_id)
+
+            user.delete()
+            logger.info('User account deleted user_id=%s', user_id)
+            return Response(status=status.HTTP_204_NO_CONTENT)
 
         serializer = UserSerializer(request.user, data=request.data, partial=True)
         if serializer.is_valid():
