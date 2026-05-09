@@ -1,3 +1,4 @@
+import { t } from "@kometa/i18n";
 import { MessageCircle, PlusCircle, Star, Users } from "lucide-react";
 
 const steps = [
@@ -28,9 +29,11 @@ export function HowItWorksSection() {
     <section id="how-it-works" className="py-24 px-4">
       <div className="max-w-6xl mx-auto">
         <div className="text-center mb-16">
-          <h2 className="text-3xl sm:text-4xl font-bold text-foreground mb-4">How it works</h2>
+          <h2 className="text-3xl sm:text-4xl font-bold text-foreground mb-4">
+            {t("How it works")}
+          </h2>
           <p className="text-muted-foreground max-w-2xl mx-auto text-pretty">
-            From request to completion in four simple steps. No barriers, no complexity.
+            {t("From request to completion in four simple steps. No barriers, no complexity.")}
           </p>
         </div>
 
@@ -53,8 +56,8 @@ export function HowItWorksSection() {
                   <step.icon className="w-7 h-7 text-primary" />
                 </div>
 
-                <h3 className="font-semibold text-foreground mb-2">{step.title}</h3>
-                <p className="text-sm text-muted-foreground">{step.description}</p>
+                <h3 className="font-semibold text-foreground mb-2">{t(step.title)}</h3>
+                <p className="text-sm text-muted-foreground">{t(step.description)}</p>
               </div>
             </div>
           ))}

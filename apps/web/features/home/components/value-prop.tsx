@@ -1,3 +1,4 @@
+import { t } from "@kometa/i18n";
 import { Check, X } from "lucide-react";
 
 const comparisons = [
@@ -39,11 +40,12 @@ export function ValuePropSection() {
       <div className="max-w-4xl mx-auto">
         <div className="text-center mb-16">
           <h2 className="text-3xl sm:text-4xl font-bold text-foreground mb-4 text-balance">
-            Not another freelance platform
+            {t("Not another freelance platform")}
           </h2>
           <p className="text-muted-foreground max-w-2xl mx-auto text-pretty">
-            Traditional platforms are built for long-term gigs and professional portfolios. Kometa
-            is built for quick help between neighbors.
+            {t(
+              "Traditional platforms are built for long-term gigs and professional portfolios. Kometa is built for quick help between neighbors.",
+            )}
           </p>
         </div>
 
@@ -51,15 +53,15 @@ export function ValuePropSection() {
         <div className="rounded-3xl border border-border bg-card overflow-hidden">
           {/* Header */}
           <div className="grid grid-cols-3 gap-4 p-4 sm:p-6 border-b border-border bg-secondary/50">
-            <div className="text-sm font-medium text-muted-foreground">Feature</div>
+            <div className="text-sm font-medium text-muted-foreground">{t("Feature")}</div>
             <div className="text-center">
               <span className="inline-block px-4 py-1.5 rounded-full bg-primary text-primary-foreground text-sm font-semibold">
-                Kometa
+                {t("Kometa")}
               </span>
             </div>
             <div className="text-center">
               <span className="inline-block px-4 py-1.5 rounded-full bg-secondary text-secondary-foreground text-sm font-medium">
-                Traditional
+                {t("Traditional")}
               </span>
             </div>
           </div>
@@ -72,7 +74,7 @@ export function ValuePropSection() {
                 index !== comparisons.length - 1 ? "border-b border-border" : ""
               }`}
             >
-              <div className="text-sm text-foreground">{row.feature}</div>
+              <div className="text-sm text-foreground">{t(row.feature)}</div>
               <div className="flex justify-center">
                 {row.kometa ? (
                   <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">

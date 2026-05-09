@@ -1,3 +1,4 @@
+export { authValidationErrorHandlers } from "./auth-errors";
 export { emptyStateHandlers } from "./empty";
 export { serverErrorHandlers } from "./error";
 export {

@@ -1,8 +1,12 @@
 import type { Metadata, Viewport } from "next";
 import { Analytics } from "@vercel/analytics/next";
+import { defaultI18n } from "@kometa/i18n";
 import { Inter } from "next/font/google";
 import localFont from "next/font/local";
+import { ThemeProvider } from "@/components/theme-provider";
+import { KometaI18nProvider } from "@/shared/i18n/i18n-provider";
 import { MockServiceWorker } from "@/shared/mocks/mock-service-worker";
+import "mapbox-gl/dist/mapbox-gl.css";
 import "./globals.css";
 
 const inter = Inter({
@@ -17,9 +21,8 @@ const spaceGrotesk = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "Kometa - Micro-tasks. Mutual aid. Zero friction.",
-  description:
-    "Kometa is a peer-to-peer micro-task platform for young adults. Post tasks, find help, and build community with zero friction.",
+  title: defaultI18n._("app.title"),
+  description: defaultI18n._("app.description"),
   generator: "v0.app",
   icons: {
     icon: [
@@ -54,9 +57,18 @@ export default function RootLayout({
   return (
     <html lang="en" className="bg-background" suppressHydrationWarning>
       <body className={`${inter.variable} ${spaceGrotesk.variable} font-sans antialiased`}>
-        <MockServiceWorker />
-        {children}
-        {process.env.NODE_ENV === "production" && <Analytics />}
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="dark"
+          enableSystem={false}
+          disableTransitionOnChange
+        >
+          <KometaI18nProvider>
+            <MockServiceWorker />
+            {children}
+            {process.env.NODE_ENV === "production" && <Analytics />}
+          </KometaI18nProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

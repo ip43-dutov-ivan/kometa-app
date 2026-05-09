@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { Command as CommandPrimitive } from "cmdk";
+import { t } from "@kometa/i18n";
 import { SearchIcon } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -27,8 +28,8 @@ function Command({ className, ...props }: React.ComponentProps<typeof CommandPri
 }
 
 function CommandDialog({
-  title = "Command Palette",
-  description = "Search for a command to run...",
+  title = t("Command Palette"),
+  description = t("Search for a command to run..."),
   children,
   className,
   showCloseButton = true,

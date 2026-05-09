@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { t } from "@kometa/i18n";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ArrowRight, Loader2 } from "lucide-react";
@@ -27,16 +28,17 @@ export function FooterCTA() {
     <section className="py-24 px-4">
       <div className="max-w-2xl mx-auto text-center">
         <h2 className="text-3xl sm:text-4xl font-bold text-foreground mb-4 text-balance">
-          Ready to join the community?
+          {t("Ready to join the community?")}
         </h2>
         <p className="text-muted-foreground mb-10 text-pretty">
-          Be the first to know when Kometa launches in your area. Early members get priority access
-          and zero fees for the first month.
+          {t(
+            "Be the first to know when Kometa launches in your area. Early members get priority access and zero fees for the first month.",
+          )}
         </p>
 
         {isSubmitted ? (
           <div className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-primary/10 border border-primary/30 text-primary">
-            <span className="font-medium">{"You're on the list!"}</span>
+            <span className="font-medium">{t("You're on the list!")}</span>
           </div>
         ) : (
           <form
@@ -45,7 +47,7 @@ export function FooterCTA() {
           >
             <Input
               type="email"
-              placeholder="Enter your email"
+              placeholder={t("Enter your email")}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="h-12 rounded-full px-5 bg-card border-border focus-visible:border-primary text-foreground placeholder:text-muted-foreground"
@@ -60,7 +62,7 @@ export function FooterCTA() {
                 <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
                 <>
-                  Join Waitlist
+                  {t("Join Waitlist")}
                   <ArrowRight className="w-4 h-4 ml-2" />
                 </>
               )}
@@ -74,17 +76,17 @@ export function FooterCTA() {
             <BrandLockup />
             <div className="flex items-center gap-6 text-sm text-muted-foreground">
               <a href="#" className="hover:text-foreground transition-colors">
-                Privacy
+                {t("Privacy")}
               </a>
               <a href="#" className="hover:text-foreground transition-colors">
-                Terms
+                {t("Terms")}
               </a>
               <a href="#" className="hover:text-foreground transition-colors">
-                Contact
+                {t("Contact")}
               </a>
             </div>
             <span className="text-sm text-muted-foreground">
-              &copy; {new Date().getFullYear()} Kometa. All rights reserved.
+              &copy; {new Date().getFullYear()} {t("Kometa. All rights reserved.")}
             </span>
           </div>
         </div>

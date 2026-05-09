@@ -2,6 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { t } from "@kometa/i18n";
 import type { Report, ReportStatus } from "@kometa/logic";
 import { kometaApi } from "@/shared/api/client";
 import { EmptyState, ErrorState, LoadingState } from "@/shared/components/page-state";
@@ -34,7 +35,7 @@ export function AdminReportDetailPage({ reportId }: { reportId: string }) {
         setStatus(nextReport.status);
       }
     } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : "Report failed to load.");
+      setError(caughtError instanceof Error ? caughtError.message : t("Report failed to load."));
     } finally {
       setIsLoading(false);
     }
@@ -56,25 +57,25 @@ export function AdminReportDetailPage({ reportId }: { reportId: string }) {
       });
       setReport(nextReport);
     } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : "Report update failed.");
+      setError(caughtError instanceof Error ? caughtError.message : t("Report update failed."));
     } finally {
       setIsSubmitting(false);
     }
   }
 
   if (isLoading) {
-    return <LoadingState label="Loading report" />;
+    return <LoadingState label={t("Loading report")} />;
   }
 
   if (!report) {
-    return error ? <ErrorState message={error} /> : <EmptyState title="Report not found" />;
+    return error ? <ErrorState message={error} /> : <EmptyState title={t("Report not found")} />;
   }
 
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
       <section className="grid gap-5">
         <div>
-          <h1 className="font-heading text-3xl font-semibold">Report detail</h1>
+          <h1 className="font-heading text-3xl font-semibold">{t("Report detail")}</h1>
           <p className="mt-2 text-muted-foreground">{report.id}</p>
         </div>
         {error ? <ErrorState message={error} /> : null}
@@ -83,32 +84,46 @@ export function AdminReportDetailPage({ reportId }: { reportId: string }) {
             <CardTitle>{report.reason}</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-2 text-sm">
-            <span>Status: {report.status}</span>
-            <span>Reporter: {report.reporterId}</span>
-            <span>Reported user: {report.reportedUserId}</span>
-            {report.taskId ? <span>Task: {report.taskId}</span> : null}
-            {report.resolutionNote ? <span>Resolution: {report.resolutionNote}</span> : null}
+            <span>
+              {t("Status")}: {t(report.status)}
+            </span>
+            <span>
+              {t("Reporter")}: {report.reporterId}
+            </span>
+            <span>
+              {t("Reported user")}: {report.reportedUserId}
+            </span>
+            {report.taskId ? (
+              <span>
+                {t("Task")}: {report.taskId}
+              </span>
+            ) : null}
+            {report.resolutionNote ? (
+              <span>
+                {t("Resolution")}: {report.resolutionNote}
+              </span>
+            ) : null}
           </CardContent>
         </Card>
       </section>
       <aside className="h-fit rounded-lg border p-5">
         <form className="grid gap-4" onSubmit={updateReport}>
           <div className="grid gap-2">
-            <Label>Status</Label>
+            <Label>{t("Status")}</Label>
             <Select value={status} onValueChange={(value) => setStatus(value as ReportStatus)}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="open">open</SelectItem>
-                <SelectItem value="reviewing">reviewing</SelectItem>
-                <SelectItem value="resolved">resolved</SelectItem>
-                <SelectItem value="dismissed">dismissed</SelectItem>
+                <SelectItem value="open">{t("open")}</SelectItem>
+                <SelectItem value="reviewing">{t("reviewing")}</SelectItem>
+                <SelectItem value="resolved">{t("resolved")}</SelectItem>
+                <SelectItem value="dismissed">{t("dismissed")}</SelectItem>
               </SelectContent>
             </Select>
           </div>
           <div className="grid gap-2">
-            <Label htmlFor="resolutionNote">Resolution note</Label>
+            <Label htmlFor="resolutionNote">{t("Resolution note")}</Label>
             <Textarea
               id="resolutionNote"
               name="resolutionNote"
@@ -117,10 +132,10 @@ export function AdminReportDetailPage({ reportId }: { reportId: string }) {
             />
           </div>
           <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? "Saving" : "Save review"}
+            {isSubmitting ? t("Saving") : t("Save review")}
           </Button>
           <Button asChild variant="outline">
-            <Link href={`/admin/users/${report.reportedUserId}`}>Moderate user</Link>
+            <Link href={`/admin/users/${report.reportedUserId}`}>{t("Moderate user")}</Link>
           </Button>
         </form>
       </aside>

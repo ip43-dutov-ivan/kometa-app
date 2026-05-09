@@ -18,7 +18,10 @@ def task_payload(**overrides):
         'title': 'Build a website',
         'description': 'I need a website for my business',
         'category': 'web-development',
-        'location': 'Remote',
+        'location': {
+            'label': 'Remote',
+            'isRemote': True,
+        },
         'compensation': {
             'type': 'money',
             'amount': 500,
@@ -32,4 +35,14 @@ def task_payload(**overrides):
 def create_task(owner, **overrides):
     defaults = task_payload()
     defaults.update(overrides)
+    location = defaults.pop('location')
+    defaults.update({
+        'location_label': location['label'],
+        'location_is_remote': location.get('isRemote', False),
+        'location_latitude': location.get('latitude'),
+        'location_longitude': location.get('longitude'),
+        'location_city_id': location.get('cityId', 'remote' if location.get('isRemote', False) else ''),
+        'location_city_label': location.get('cityLabel', 'Remote' if location.get('isRemote', False) else ''),
+        'location_country_code': location.get('countryCode', ''),
+    })
     return Task.objects.create(owner=owner, **defaults)

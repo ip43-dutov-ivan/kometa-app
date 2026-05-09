@@ -1,21 +1,36 @@
 import logging
 
-from rest_framework import status
+from rest_framework import mixins, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.viewsets import ModelViewSet
+from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
-from django.db.models import Q
+from django.db.models import Count, Q
 from ..models import Feedback, Task
 from ..serializers import FeedbackSerializer, TaskSerializer
 
 logger = logging.getLogger(__name__)
 
+LEGACY_TASK_CATEGORY_LABELS = {
+    'design': ['Design', 'Design review'],
+    'education': ['Education'],
+    'errands': ['Errands'],
+    'home_tech': ['Home tech'],
+    'other': ['General'],
+}
 
-class TaskViewSet(ModelViewSet):
+
+class TaskViewSet(
+    mixins.CreateModelMixin,
+    mixins.RetrieveModelMixin,
+    mixins.ListModelMixin,
+    mixins.DestroyModelMixin,
+    GenericViewSet,
+):
     queryset = Task.objects.all()
     serializer_class = TaskSerializer
     permission_classes = [IsAuthenticated]
+    http_method_names = ['get', 'post', 'delete', 'head', 'options']
 
     def perform_create(self, serializer):
         task = serializer.save(owner=self.request.user)
@@ -31,6 +46,7 @@ class TaskViewSet(ModelViewSet):
         status_param = self.request.query_params.get('status', None)
         category_param = self.request.query_params.get('category', None)
         location_param = self.request.query_params.get('location', None)
+        location_city_param = self.request.query_params.get('locationCity', None)
         owner_param = self.request.query_params.get('owner', None)
         involved_param = self.request.query_params.get('involved', None)
         available_param = self.request.query_params.get('available', None)
@@ -38,9 +54,17 @@ class TaskViewSet(ModelViewSet):
         if status_param:
             queryset = queryset.filter(status=status_param)
         if category_param:
-            queryset = queryset.filter(category__icontains=category_param)
+            category_query = Q(category__iexact=category_param)
+            for legacy_label in LEGACY_TASK_CATEGORY_LABELS.get(category_param, []):
+                category_query |= Q(category__iexact=legacy_label)
+            queryset = queryset.filter(category_query)
         if location_param:
-            queryset = queryset.filter(location__icontains=location_param)
+            queryset = queryset.filter(location_label__icontains=location_param)
+        if location_city_param:
+            if location_city_param == 'remote':
+                queryset = queryset.filter(location_is_remote=True)
+            else:
+                queryset = queryset.filter(location_city_id=location_city_param)
         if owner_param == 'me':
             queryset = queryset.filter(owner=self.request.user)
         if involved_param == 'me':
@@ -48,9 +72,35 @@ class TaskViewSet(ModelViewSet):
                 Q(owner=self.request.user) | Q(selected_response__provider=self.request.user)
             )
         if available_param == 'true':
-            queryset = queryset.filter(status='open').exclude(owner=self.request.user)
+            queryset = (
+                queryset
+                .filter(status='open')
+                .exclude(owner=self.request.user)
+                .exclude(responses__provider=self.request.user)
+                .distinct()
+            )
 
         return queryset
+
+    @action(detail=False, methods=['get'], url_path='location-facets')
+    def location_facets(self, request):
+        queryset = self.get_queryset()
+
+        facets = (
+            queryset.exclude(location_city_id='')
+            .values('location_city_id', 'location_city_label')
+            .annotate(count=Count('id'))
+            .order_by('location_city_label')
+        )
+
+        return Response([
+            {
+                'id': facet['location_city_id'],
+                'label': facet['location_city_label'],
+                'count': facet['count'],
+            }
+            for facet in facets
+        ])
 
     def list(self, request, *args, **kwargs):
         queryset = self.get_queryset()
@@ -81,43 +131,42 @@ class TaskViewSet(ModelViewSet):
             },
         })
 
-    def update(self, request, *args, **kwargs):
+    def destroy(self, request, *args, **kwargs):
         task = self.get_object()
         if task.owner != request.user:
             logger.warning(
-                'Task update denied task_id=%s actor_id=%s owner_id=%s reason=not_owner',
+                'Task delete denied task_id=%s actor_id=%s owner_id=%s reason=not_owner',
                 task.id,
                 request.user.id,
                 task.owner_id,
             )
             return Response(
-                {'detail': 'Only the task owner can update this task.'},
+                {'detail': 'Only the task owner can delete this task.'},
                 status=status.HTTP_403_FORBIDDEN
             )
         if task.status != 'open':
             logger.warning(
-                'Task update denied task_id=%s actor_id=%s status=%s reason=invalid_status',
+                'Task delete denied task_id=%s actor_id=%s status=%s reason=invalid_status',
                 task.id,
                 request.user.id,
                 task.status,
             )
             return Response(
-                {'detail': 'Can only update tasks in open status.'},
-                status=status.HTTP_400_BAD_REQUEST
+                {'detail': 'Only open tasks can be deleted.'},
+                status=status.HTTP_409_CONFLICT
             )
 
-        partial = kwargs.pop('partial', False)
-        serializer = self.get_serializer(task, data=request.data, partial=partial)
-        if serializer.is_valid():
-            serializer.save()
-            logger.info(
-                'Task updated task_id=%s owner_id=%s status=%s',
-                task.id,
-                request.user.id,
-                task.status,
-            )
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        declined_count = task.responses.filter(status='pending').update(status='declined')
+        task.status = 'cancelled'
+        task.save(update_fields=['status', 'updated_at'])
+        logger.info(
+            'Task cancelled task_id=%s owner_id=%s declined_responses=%s',
+            task.id,
+            request.user.id,
+            declined_count,
+        )
+        serializer = self.get_serializer(task)
+        return Response(serializer.data)
 
     @action(detail=True, methods=['post'])
     def start(self, request, pk=None):
@@ -133,16 +182,22 @@ class TaskViewSet(ModelViewSet):
                 {'detail': 'Can only start tasks in matched status.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        if task.owner != request.user and task.selected_response.provider != request.user:
+        if task.selected_response is None:
+            return Response(
+                {'detail': 'Task has no matched provider.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if task.selected_response.provider != request.user:
             logger.warning(
-                'Task start denied task_id=%s actor_id=%s owner_id=%s provider_id=%s reason=not_participant',
+                'Task start denied task_id=%s actor_id=%s owner_id=%s provider_id=%s reason=not_provider',
                 task.id,
                 request.user.id,
                 task.owner_id,
                 task.selected_response.provider_id,
             )
             return Response(
-                {'detail': 'Only the task owner or provider can start this task.'},
+                {'detail': 'Only the matched provider can start this task.'},
                 status=status.HTTP_403_FORBIDDEN
             )
 

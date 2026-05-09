@@ -8,11 +8,7 @@ export type MessageId = string;
 export type FeedbackId = string;
 export type ReportId = string;
 
-export interface ApiErrorDto {
-  code: string;
-  message: string;
-  details?: Record<string, unknown>;
-}
+export type { ApiErrorDto } from "./errors";
 
 export interface PageInfo {
   limit: number;
@@ -57,12 +53,22 @@ export interface MoneyCompensation {
 
 export type Compensation = MoneyCompensation;
 
+export interface TaskLocation {
+  label: string;
+  isRemote: boolean;
+  latitude?: number;
+  longitude?: number;
+  cityId?: string;
+  cityLabel?: string;
+  countryCode?: string;
+}
+
 export interface Task {
   id: TaskId;
   title: string;
   description: string;
   category: string;
-  location: string;
+  location: TaskLocation;
   compensation: Compensation;
   status: TaskStatus;
   ownerId: UserId;
@@ -111,6 +117,13 @@ export interface Conversation {
   taskId: TaskId;
   participantIds: UserId[];
   lastMessageAt: string;
+  unreadCount: number;
+  readStates: ConversationReadState[];
+}
+
+export interface ConversationReadState {
+  userId: UserId;
+  lastReadAt: string;
 }
 
 export interface Message {
@@ -147,15 +160,24 @@ export interface Report {
 
 export interface AuthSession {
   accessToken: string;
+  refreshToken: string;
   user: User;
+}
+
+export interface RefreshSessionRequest {
+  refreshToken: string;
+}
+
+export interface RefreshSessionResponse {
+  accessToken: string;
 }
 
 export interface RegisterRequest {
   email: string;
   password: string;
-  name: string;
-  location: string;
-  bio: string;
+  name?: string;
+  location?: string;
+  bio?: string;
 }
 
 export interface LoginRequest {
@@ -171,8 +193,6 @@ export type CreateTaskRequest = Pick<
   Task,
   "title" | "description" | "category" | "location" | "compensation"
 >;
-
-export type UpdateTaskRequest = Partial<CreateTaskRequest>;
 
 export interface RequestCompletionRequest {
   note?: string;
@@ -193,6 +213,16 @@ export interface CreateTaskResponseRequest {
 
 export interface SendMessageRequest {
   body: string;
+}
+
+export interface ChatUnreadSummary {
+  totalUnreadCount: number;
+  unreadCountsByConversationId: Record<ConversationId, number>;
+}
+
+export interface MarkConversationReadResponse {
+  conversationId: ConversationId;
+  unreadCount: number;
 }
 
 export interface LeaveFeedbackRequest {
@@ -236,8 +266,21 @@ export interface ListTasksQuery extends PaginationQuery {
   status?: TaskStatus;
   category?: string;
   location?: string;
+  locationCity?: string;
   owner?: "me";
   involved?: "me";
+  available?: boolean;
+}
+
+export interface TaskLocationFacet {
+  id: string;
+  label: string;
+  count: number;
+}
+
+export interface ListTaskLocationFacetsQuery {
+  status?: TaskStatus;
+  category?: string;
   available?: boolean;
 }
 
@@ -259,6 +302,33 @@ export interface ListMessagesQuery {
   before?: string;
   limit?: number;
 }
+
+export interface ChatClientEvent {
+  type: "message.create" | "conversation.read";
+  body?: string;
+  clientMessageId?: string;
+}
+
+export interface ChatMessageCreatedEvent {
+  type: "chat.message.created";
+  message: Message;
+  conversationId: ConversationId;
+  taskId: TaskId;
+  clientMessageId?: string;
+}
+
+export interface ConversationReadEvent {
+  type: "conversation.read";
+  conversationId: ConversationId;
+  userId: UserId;
+  lastReadAt: string;
+}
+
+export type ChatServerEvent =
+  | { type: "message.created"; message: Message; clientMessageId?: string }
+  | ChatMessageCreatedEvent
+  | ConversationReadEvent
+  | { type: "error"; code: string; message: string };
 
 export interface ListReportsQuery extends PaginationQuery {
   status?: ReportStatus;

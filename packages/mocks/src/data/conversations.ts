@@ -6,24 +6,44 @@ export const conversations: Conversation[] = [
     taskId: "task-2",
     participantIds: ["user-1", "user-2"],
     lastMessageAt: "2026-05-02T16:20:00.000Z",
+    unreadCount: 1,
+    readStates: [
+      { userId: "user-1", lastReadAt: "2026-05-02T16:20:00.000Z" },
+      { userId: "user-2", lastReadAt: "2026-05-02T16:10:00.000Z" },
+    ],
   },
   {
     id: "conversation-2",
     taskId: "task-4",
     participantIds: ["user-1", "user-2"],
     lastMessageAt: "2026-05-04T17:35:00.000Z",
+    unreadCount: 0,
+    readStates: [
+      { userId: "user-1", lastReadAt: "2026-05-04T17:35:00.000Z" },
+      { userId: "user-2", lastReadAt: "2026-05-04T17:35:00.000Z" },
+    ],
   },
   {
     id: "conversation-3",
     taskId: "task-5",
     participantIds: ["user-2", "user-1"],
     lastMessageAt: "2026-05-05T11:45:00.000Z",
+    unreadCount: 0,
+    readStates: [
+      { userId: "user-1", lastReadAt: "2026-05-05T11:45:00.000Z" },
+      { userId: "user-2", lastReadAt: "2026-05-05T11:45:00.000Z" },
+    ],
   },
   {
     id: "conversation-4",
     taskId: "task-6",
     participantIds: ["user-3", "user-1"],
     lastMessageAt: "2026-05-05T09:00:00.000Z",
+    unreadCount: 1,
+    readStates: [
+      { userId: "user-1", lastReadAt: "2026-05-05T09:00:00.000Z" },
+      { userId: "user-3", lastReadAt: "2026-05-05T08:45:00.000Z" },
+    ],
   },
 ];
 

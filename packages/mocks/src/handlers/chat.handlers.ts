@@ -13,6 +13,22 @@ import {
 } from "./utils";
 
 export const chatHandlers = [
+  http.get(apiPath("/me/chat-summary"), () => {
+    const unreadCountsByConversationId = Object.fromEntries(
+      conversations
+        .filter((conversation) => conversation.participantIds.includes(currentUserId))
+        .map((conversation) => [conversation.id, conversation.unreadCount]),
+    );
+
+    return json({
+      totalUnreadCount: Object.values(unreadCountsByConversationId).reduce(
+        (total, count) => total + count,
+        0,
+      ),
+      unreadCountsByConversationId,
+    });
+  }),
+
   http.get(apiPath("/conversations"), ({ request }) => {
     const url = new URL(request.url);
     const { limit, offset } = getPagination(url);
@@ -43,13 +59,22 @@ export const chatHandlers = [
     const url = new URL(request.url);
     const before = url.searchParams.get("before");
     const limit = Number.parseInt(url.searchParams.get("limit") ?? "50", 10);
-    const result = messages
+    const matchingMessages = messages
       .filter((message) => message.conversationId === params.conversationId)
       .filter((message) => !before || message.createdAt < before)
-      .sort((first, second) => first.createdAt.localeCompare(second.createdAt))
-      .slice(-Math.max(1, Number.isFinite(limit) ? limit : 50));
+      .sort((first, second) => first.createdAt.localeCompare(second.createdAt));
+    const effectiveLimit = Math.max(1, Number.isFinite(limit) ? limit : 50);
+    const result = matchingMessages.slice(-effectiveLimit);
 
-    return json(result);
+    return json({
+      items: result,
+      pageInfo: {
+        limit: effectiveLimit,
+        offset: 0,
+        total: matchingMessages.length,
+        hasMore: matchingMessages.length > effectiveLimit,
+      },
+    });
   }),
 
   http.post(apiPath("/conversations/:conversationId/messages"), async ({ params, request }) => {
@@ -83,5 +108,27 @@ export const chatHandlers = [
     messages.push(message);
 
     return json(message, { status: 201 });
+  }),
+
+  http.post(apiPath("/conversations/:conversationId/read"), ({ params }) => {
+    const conversation = conversations.find((item) => item.id === params.conversationId);
+
+    if (!conversation || !conversation.participantIds.includes(currentUserId)) {
+      return error("Conversation not found", "conversation_not_found", 404);
+    }
+
+    conversation.unreadCount = 0;
+    const readAt = now();
+    const readState = conversation.readStates.find((item) => item.userId === currentUserId);
+    if (readState) {
+      readState.lastReadAt = readAt;
+    } else {
+      conversation.readStates.push({ userId: currentUserId, lastReadAt: readAt });
+    }
+
+    return json({
+      conversationId: conversation.id,
+      unreadCount: conversation.unreadCount,
+    });
   }),
 ];

@@ -1,5 +1,6 @@
 "use client";
 
+import { t } from "@kometa/i18n";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Clock, DollarSign, MapPin, User } from "lucide-react";
@@ -15,21 +16,23 @@ export function HeroSection() {
           {/* Left side - Copy */}
           <div className="text-center lg:text-left">
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-foreground leading-tight text-balance">
-              Micro-tasks. <span className="text-primary">Mutual aid.</span> Zero friction.
+              {t("Micro-tasks.")} <span className="text-primary">{t("Mutual aid.")}</span>{" "}
+              {t("Zero friction.")}
             </h1>
 
             <p className="mt-6 text-lg text-muted-foreground max-w-xl mx-auto lg:mx-0 leading-relaxed text-pretty">
-              A peer-to-peer platform where anyone can post or complete micro-tasks. No rigid roles.
-              No complex portfolios. Just fast, local help when you need it.
+              {t(
+                "A peer-to-peer platform where anyone can post or complete micro-tasks. No rigid roles. No complex portfolios. Just fast, local help when you need it.",
+              )}
             </p>
 
             {/* CTA Buttons */}
             <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
               <Button variant="secondary" className="rounded-full h-12 px-8 text-base font-medium">
-                Post a Task
+                {t("Post a Task")}
               </Button>
               <Button className="rounded-full h-12 px-8 text-base font-medium bg-primary text-primary-foreground hover:bg-primary/90">
-                Find a Task
+                {t("Find a Task")}
               </Button>
             </div>
           </div>
@@ -53,33 +56,33 @@ export function HeroSection() {
 
                   {/* App header */}
                   <div className="mb-4">
-                    <h3 className="text-lg font-semibold text-foreground">Nearby Tasks</h3>
-                    <p className="text-xs text-muted-foreground">3 available in your area</p>
+                    <h3 className="text-lg font-semibold text-foreground">{t("Nearby Tasks")}</h3>
+                    <p className="text-xs text-muted-foreground">{t("3 available in your area")}</p>
                   </div>
 
                   {/* Task cards */}
                   <div className="flex-1 space-y-3 overflow-hidden">
                     <TaskCard
-                      title="Help me assemble IKEA desk"
-                      location="0.3 mi away"
-                      time="~45 min"
+                      title={t("Help me assemble IKEA desk")}
+                      location={t("0.3 mi away")}
+                      time={t("~45 min")}
                       price="$25"
-                      user="Sarah M."
+                      user={t("Sarah M.")}
                     />
                     <TaskCard
-                      title="Walk my dog this afternoon"
-                      location="0.5 mi away"
-                      time="~30 min"
+                      title={t("Walk my dog this afternoon")}
+                      location={t("0.5 mi away")}
+                      time={t("~30 min")}
                       price="$15"
-                      user="Marcus T."
+                      user={t("Marcus T.")}
                       highlighted
                     />
                     <TaskCard
-                      title="Quick Python tutoring"
-                      location="Remote"
-                      time="~1 hr"
+                      title={t("Quick Python tutoring")}
+                      location={t("Remote")}
+                      time={t("~1 hr")}
                       price="$40"
-                      user="Alex K."
+                      user={t("Alex K.")}
                     />
                   </div>
                 </div>

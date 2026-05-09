@@ -1,7 +1,7 @@
 import { http } from "msw";
 import { apiPath } from "../config";
 import { completionRequests, currentUserId, responses, tasks } from "../data";
-import type { CompletionRequest, Task, TaskStatus, UserId } from "../types";
+import type { CompletionRequest, Task, TaskLocation, TaskStatus, UserId } from "../types";
 import {
   createId,
   error,
@@ -22,8 +22,9 @@ export const taskHandlers = [
     const owner = url.searchParams.get("owner");
     const involved = url.searchParams.get("involved");
     const available = url.searchParams.get("available");
-    const category = url.searchParams.get("category")?.toLocaleLowerCase();
+    const category = normalizeTaskCategory(url.searchParams.get("category"));
     const location = url.searchParams.get("location")?.toLocaleLowerCase();
+    const locationCity = url.searchParams.get("locationCity");
     const { limit, offset } = getPagination(url);
 
     const result = tasks.filter((task) => {
@@ -52,11 +53,15 @@ export const taskHandlers = [
         return false;
       }
 
-      if (category && !task.category.toLocaleLowerCase().includes(category)) {
+      if (category && normalizeTaskCategory(task.category) !== category) {
         return false;
       }
 
-      if (location && !task.location.toLocaleLowerCase().includes(location)) {
+      if (location && !task.location.label.toLocaleLowerCase().includes(location)) {
+        return false;
+      }
+
+      if (locationCity && getTaskLocationCityId(task) !== locationCity) {
         return false;
       }
 
@@ -64,6 +69,45 @@ export const taskHandlers = [
     });
 
     return pagedListJson(result, limit, offset);
+  }),
+
+  http.get(apiPath("/tasks/location-facets"), ({ request }) => {
+    const url = new URL(request.url);
+    const status = url.searchParams.get("status") as TaskStatus | null;
+    const available = url.searchParams.get("available");
+    const category = normalizeTaskCategory(url.searchParams.get("category"));
+    const counts = new Map<string, { id: string; label: string; count: number }>();
+
+    for (const task of tasks) {
+      if (status && task.status !== status) {
+        continue;
+      }
+
+      if (available === "true" && (task.ownerId === currentUserId || task.status !== "open")) {
+        continue;
+      }
+
+      if (category && normalizeTaskCategory(task.category) !== category) {
+        continue;
+      }
+
+      const cityId = getTaskLocationCityId(task);
+      const cityLabel = getTaskLocationCityLabel(task);
+      if (!cityId || !cityLabel) {
+        continue;
+      }
+
+      const current = counts.get(cityId);
+      if (current) {
+        current.count += 1;
+      } else {
+        counts.set(cityId, { id: cityId, label: cityLabel, count: 1 });
+      }
+    }
+
+    return json(
+      [...counts.values()].sort((first, second) => first.label.localeCompare(second.label)),
+    );
   }),
 
   http.post(apiPath("/tasks"), async ({ request }) => {
@@ -74,13 +118,18 @@ export const taskHandlers = [
 
     const body = await request.json().catch(() => ({}));
     const input = body as Partial<Task>;
+    const locationResult = normalizeTaskLocation(input.location);
+
+    if ("response" in locationResult) {
+      return locationResult.response;
+    }
 
     const task: Task = {
       id: createId("task"),
       title: input.title?.trim() || "Untitled task",
       description: input.description?.trim() || "No description provided.",
-      category: input.category?.trim() || "General",
-      location: input.location?.trim() || "Remote",
+      category: normalizeTaskCategory(input.category) || "other",
+      location: locationResult.location,
       compensation: input.compensation ?? { type: "money", amount: 0, currency: "UAH" },
       status: "open",
       ownerId: currentUserId,
@@ -103,7 +152,30 @@ export const taskHandlers = [
     return json(task);
   }),
 
-  http.patch(apiPath("/tasks/:taskId"), async ({ params, request }) => {
+  http.get(apiPath("/tasks/:taskId/completion-requests"), ({ params }) => {
+    const activeUser = requireActiveCurrentUser();
+    if (activeUser.response) {
+      return activeUser.response;
+    }
+
+    const task = tasks.find((item) => item.id === params.taskId);
+
+    if (!task) {
+      return error("Task not found", "task_not_found", 404);
+    }
+
+    if (!isTaskParticipant(task)) {
+      return error(
+        "Only matched participants can view completion requests",
+        "completion_request_forbidden",
+        403,
+      );
+    }
+
+    return json(completionRequests.filter((item) => item.taskId === task.id));
+  }),
+
+  http.delete(apiPath("/tasks/:taskId"), ({ params }) => {
     const activeUser = requireActiveCurrentUser();
     if (activeUser.response) {
       return activeUser.response;
@@ -116,24 +188,22 @@ export const taskHandlers = [
     }
 
     if (task.ownerId !== currentUserId) {
-      return error("Only the task owner can update this task", "task_update_forbidden", 403);
+      return error("Only the task owner can delete this task", "task_delete_forbidden", 403);
     }
 
     if (task.status !== "open") {
-      return error("Only open tasks can be updated", "task_not_editable", 409);
+      return error("Only open tasks can be deleted", "task_delete_not_allowed", 409);
     }
 
-    const body = await request.json().catch(() => ({}));
-    const input = body as Partial<Task>;
+    const timestamp = now();
+    task.status = "cancelled";
+    task.updatedAt = timestamp;
 
-    Object.assign(task, {
-      title: input.title?.trim() || task.title,
-      description: input.description?.trim() || task.description,
-      category: input.category?.trim() || task.category,
-      location: input.location?.trim() || task.location,
-      compensation: input.compensation ?? task.compensation,
-      updatedAt: now(),
-    });
+    for (const response of responses) {
+      if (response.taskId === task.id && response.status === "pending") {
+        response.status = "declined";
+      }
+    }
 
     return json(task);
   }),
@@ -154,6 +224,14 @@ export const taskHandlers = [
 
     if (!match) {
       return error("Only matched participants can start this task", "task_start_forbidden", 403);
+    }
+
+    if (match.providerId !== currentUserId) {
+      return error(
+        "Only the matched provider can start this task",
+        "task_start_requester_forbidden",
+        403,
+      );
     }
 
     if (task.status !== "matched") {
@@ -178,10 +256,20 @@ export const taskHandlers = [
       return error("Task not found", "task_not_found", 404);
     }
 
-    if (!isTaskParticipant(task)) {
+    const match = getMatchForTask(task.id, currentUserId);
+
+    if (!match) {
       return error(
         "Only matched participants can request completion",
         "completion_request_forbidden",
+        403,
+      );
+    }
+
+    if (match.providerId !== currentUserId) {
+      return error(
+        "Only the matched provider can request completion",
+        "completion_request_requester_forbidden",
         403,
       );
     }
@@ -277,6 +365,111 @@ export const taskHandlers = [
     },
   ),
 ];
+
+function normalizeTaskCategory(value: string | null | undefined): string {
+  const normalizedValue = value?.trim();
+  if (!normalizedValue) {
+    return "";
+  }
+
+  const legacyCategories: Record<string, string> = {
+    "design review": "design",
+    education: "education",
+    errands: "errands",
+    general: "other",
+    "home tech": "home_tech",
+  };
+
+  return legacyCategories[normalizedValue.toLocaleLowerCase()] ?? normalizedValue;
+}
+
+function normalizeTaskLocation(value: TaskLocation | undefined) {
+  if (!value || typeof value !== "object") {
+    return { response: error("Location is required", "location_required", 422) };
+  }
+
+  const label = value.label?.trim();
+  if (!label) {
+    return { response: error("Location label is required", "location_label_required", 422) };
+  }
+
+  if (value.isRemote) {
+    return {
+      location: {
+        label,
+        isRemote: true,
+        cityId: "remote",
+        cityLabel: "Remote",
+      } satisfies TaskLocation,
+    };
+  }
+
+  const latitude = value.latitude;
+  const longitude = value.longitude;
+
+  if (
+    typeof latitude !== "number" ||
+    typeof longitude !== "number" ||
+    !Number.isFinite(latitude) ||
+    !Number.isFinite(longitude)
+  ) {
+    return {
+      response: error(
+        "Physical locations require latitude and longitude",
+        "location_coordinates_required",
+        422,
+      ),
+    };
+  }
+
+  if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
+    return {
+      response: error("Location coordinates are out of range", "location_out_of_range", 422),
+    };
+  }
+
+  return {
+    location: {
+      label,
+      isRemote: false,
+      latitude,
+      longitude,
+      cityId: value.cityId?.trim() || getLocationCityIdFromLabel(label),
+      cityLabel: value.cityLabel?.trim() || getLocationCityLabelFromLabel(label),
+      countryCode: value.countryCode?.trim().toUpperCase() || "UA",
+    } satisfies TaskLocation,
+  };
+}
+
+function getTaskLocationCityId(task: Task): string {
+  return task.location.cityId || getLocationCityIdFromLabel(task.location.label);
+}
+
+function getTaskLocationCityLabel(task: Task): string {
+  return task.location.cityLabel || getLocationCityLabelFromLabel(task.location.label);
+}
+
+function getLocationCityLabelFromLabel(label: string): string {
+  return label.split(",")[0]?.trim() ?? "";
+}
+
+function getLocationCityIdFromLabel(label: string): string {
+  const cityLabel = getLocationCityLabelFromLabel(label);
+  if (!cityLabel) {
+    return "";
+  }
+
+  if (cityLabel.toLocaleLowerCase() === "remote") {
+    return "remote";
+  }
+
+  return `ua-${cityLabel
+    .normalize("NFKD")
+    .replace(/[^\w\s-]/g, "")
+    .trim()
+    .toLocaleLowerCase()
+    .replace(/[-\s]+/g, "-")}`;
+}
 
 function getPendingCompletionRequest(taskId: string, requestId: string, currentUser: UserId) {
   const task = tasks.find((item) => item.id === taskId);

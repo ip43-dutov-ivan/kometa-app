@@ -48,7 +48,18 @@ export interface UserProfile {
 
 export interface AuthSession {
   accessToken: string;
+  refreshToken: string;
   user: UserProfile;
+}
+
+export interface TaskLocation {
+  label: string;
+  isRemote: boolean;
+  latitude?: number;
+  longitude?: number;
+  cityId?: string;
+  cityLabel?: string;
+  countryCode?: string;
 }
 
 export interface Task {
@@ -56,7 +67,7 @@ export interface Task {
   title: string;
   description: string;
   category: string;
-  location: string;
+  location: TaskLocation;
   compensation: {
     type: "money";
     amount: number;
@@ -105,6 +116,13 @@ export interface Conversation {
   taskId: TaskId;
   participantIds: UserId[];
   lastMessageAt: string;
+  unreadCount: number;
+  readStates: ConversationReadState[];
+}
+
+export interface ConversationReadState {
+  userId: UserId;
+  lastReadAt: string;
 }
 
 export interface ChatMessage {

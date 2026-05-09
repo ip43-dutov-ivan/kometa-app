@@ -1,13 +1,29 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Save, ShieldAlert, Star } from "lucide-react";
-import { toUpdateCurrentUserRequest } from "@kometa/logic";
-import type { User } from "@kometa/logic";
+import { Loader2, Pencil, Save, ShieldAlert, Star, Trash2 } from "lucide-react";
+import { t } from "@kometa/i18n";
+import { createUnresolvedPhysicalTaskLocation } from "@kometa/logic";
+import type { TaskLocation, User } from "@kometa/logic";
 import { kometaApi } from "@/shared/api/client";
 import { ErrorState, LoadingState } from "@/shared/components/page-state";
+import { LocationPicker } from "@/shared/components/location-picker";
+import { SkillsPicker } from "@/shared/components/skills-picker";
 import { useKometaSession } from "@/shared/session/use-kometa-session";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,11 +32,21 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
 export function ProfilePage() {
-  const { user, setUser } = useKometaSession();
+  const router = useRouter();
+  const { user, setUser, clearSession } = useKometaSession();
   const [profile, setProfile] = useState<User | null>(user);
+  const [locationValue, setLocationValue] = useState<TaskLocation>(() =>
+    createUnresolvedPhysicalTaskLocation(user?.location ?? ""),
+  );
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [avatarError, setAvatarError] = useState<string | null>(null);
+  const [skillsValue, setSkillsValue] = useState<string[]>(user?.skills ?? []);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     let isActive = true;
@@ -31,10 +57,14 @@ export function ProfilePage() {
         if (isActive) {
           setProfile(nextProfile);
           setUser(nextProfile);
+          setLocationValue(createUnresolvedPhysicalTaskLocation(nextProfile.location));
+          setSkillsValue(nextProfile.skills);
         }
       } catch (caughtError) {
         if (isActive) {
-          setError(caughtError instanceof Error ? caughtError.message : "Profile failed to load.");
+          setError(
+            caughtError instanceof Error ? caughtError.message : t("Profile failed to load."),
+          );
         }
       } finally {
         if (isActive) {
@@ -49,107 +79,226 @@ export function ProfilePage() {
     };
   }, [setUser]);
 
+  async function handleAvatarChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setAvatarError(null);
+    setIsUploadingAvatar(true);
+    try {
+      const nextProfile = await kometaApi.users.uploadAvatar(file);
+      setProfile(nextProfile);
+      setUser(nextProfile);
+    } catch (caughtError) {
+      setAvatarError(
+        caughtError instanceof Error ? caughtError.message : t("Avatar upload failed."),
+      );
+    } finally {
+      setIsUploadingAvatar(false);
+      event.target.value = "";
+    }
+  }
+
+  async function handleDeleteAccount() {
+    setDeleteError(null);
+    setIsDeletingAccount(true);
+    try {
+      await kometaApi.users.deleteMe();
+      clearSession();
+      router.push("/");
+    } catch (caughtError) {
+      setDeleteError(
+        caughtError instanceof Error ? caughtError.message : t("Account deletion failed."),
+      );
+      setIsDeletingAccount(false);
+    }
+  }
+
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
     setIsSubmitting(true);
 
     const formData = new FormData(event.currentTarget);
-    const request = toUpdateCurrentUserRequest({
-      name: String(formData.get("name") ?? ""),
-      location: String(formData.get("location") ?? ""),
-      bio: String(formData.get("bio") ?? ""),
-      skills: String(formData.get("skills") ?? ""),
-      interests: String(formData.get("interests") ?? ""),
-      avatarUrl: String(formData.get("avatarUrl") ?? ""),
-    });
+    const request = {
+      name: String(formData.get("name") ?? "").trim(),
+      location: locationValue.label,
+      bio: String(formData.get("bio") ?? "").trim(),
+      skills: skillsValue,
+    };
 
     try {
       const nextProfile = await kometaApi.users.updateMe(request);
       setProfile(nextProfile);
       setUser(nextProfile);
     } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : "Profile update failed.");
+      setError(caughtError instanceof Error ? caughtError.message : t("Profile update failed."));
     } finally {
       setIsSubmitting(false);
     }
   }
 
   if (isLoading && !profile) {
-    return <LoadingState label="Loading profile" />;
+    return <LoadingState label={t("Loading profile")} />;
   }
 
   if (!profile) {
-    return <ErrorState message={error ?? "Profile is unavailable."} />;
+    return <ErrorState message={error ?? t("Profile is unavailable.")} />;
   }
+
+  const initials = profile.name
+    .split(" ")
+    .map((w) => w[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
 
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
       <section>
         <div className="mb-5">
-          <h1 className="font-heading text-3xl font-semibold">Profile</h1>
+          <h1 className="font-heading text-3xl font-semibold">{t("Profile")}</h1>
           <p className="mt-2 text-muted-foreground">
-            Keep your public profile accurate for task owners and responders.
+            {t("Keep your public profile accurate for task owners and responders.")}
           </p>
         </div>
         <Card className="rounded-lg">
           <CardHeader>
-            <CardTitle>Edit profile</CardTitle>
-            <CardDescription>Skills and interests are comma-separated.</CardDescription>
+            <CardTitle>{t("Edit profile")}</CardTitle>
+            <CardDescription>{t("Search or add your own skills.")}</CardDescription>
           </CardHeader>
           <CardContent>
             <form className="grid gap-4" onSubmit={onSubmit}>
               {error ? <ErrorState message={error} /> : null}
+              <div className="flex items-center gap-4">
+                <button
+                  type="button"
+                  className="group relative cursor-pointer"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isUploadingAvatar}
+                  aria-label={t("Change avatar")}
+                >
+                  <Avatar className="size-20">
+                    <AvatarImage src={profile.avatarUrl ?? ""} alt={profile.name} />
+                    <AvatarFallback className="text-xl">{initials}</AvatarFallback>
+                  </Avatar>
+                  <span className="absolute inset-0 flex items-center justify-center rounded-full bg-black/50 opacity-0 transition-opacity group-hover:opacity-100 group-disabled:opacity-100">
+                    {isUploadingAvatar ? (
+                      <Loader2 className="size-5 animate-spin text-white" />
+                    ) : (
+                      <Pencil className="size-5 text-white" />
+                    )}
+                  </span>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleAvatarChange}
+                  />
+                </button>
+                <div>
+                  <p className="text-sm font-medium">{t("Profile photo")}</p>
+                  <p className="text-sm text-muted-foreground">{t("Click to change avatar")}</p>
+                  {avatarError ? (
+                    <p className="mt-1 text-sm text-destructive">{avatarError}</p>
+                  ) : null}
+                </div>
+              </div>
               <div className="grid gap-2">
-                <Label htmlFor="name">Name</Label>
+                <Label htmlFor="name">{t("Name")}</Label>
                 <Input id="name" name="name" defaultValue={profile.name} required />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="location">Location</Label>
-                <Input id="location" name="location" defaultValue={profile.location} required />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="bio">Bio</Label>
-                <Textarea id="bio" name="bio" rows={5} defaultValue={profile.bio} required />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="skills">Skills</Label>
-                <Input id="skills" name="skills" defaultValue={profile.skills.join(", ")} />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="interests">Interests</Label>
-                <Input
-                  id="interests"
-                  name="interests"
-                  defaultValue={profile.interests.join(", ")}
+                <Label>{t("Location")}</Label>
+                <LocationPicker
+                  value={locationValue}
+                  onChange={setLocationValue}
+                  showRemoteToggle={false}
+                  disabled={isSubmitting}
                 />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="avatarUrl">Avatar URL</Label>
-                <Input id="avatarUrl" name="avatarUrl" defaultValue={profile.avatarUrl ?? ""} />
+                <Label htmlFor="bio">{t("Bio")}</Label>
+                <Textarea id="bio" name="bio" rows={5} defaultValue={profile.bio} required />
+              </div>
+              <div className="grid gap-2">
+                <Label>{t("Skills")}</Label>
+                <SkillsPicker
+                  value={skillsValue}
+                  onChange={setSkillsValue}
+                  disabled={isSubmitting}
+                />
               </div>
               <Button type="submit" disabled={isSubmitting}>
                 <Save />
-                {isSubmitting ? "Saving" : "Save profile"}
+                {isSubmitting ? t("Saving") : t("Save profile")}
               </Button>
             </form>
           </CardContent>
         </Card>
+        <Card className="rounded-lg border-destructive mt-6">
+          <CardHeader>
+            <CardTitle className="text-destructive">{t("Delete account")}</CardTitle>
+            <CardDescription>
+              {t(
+                "This action is permanent and cannot be undone. All your data including tasks, responses, messages, and profile photo will be deleted immediately.",
+              )}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-3">
+            {deleteError ? <ErrorState message={deleteError} /> : null}
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" disabled={isDeletingAccount}>
+                  <Trash2 />
+                  {isDeletingAccount ? t("Deleting") : t("Delete my account")}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>{t("Delete your account?")}</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    {t(
+                      "This action is permanent and cannot be undone. All your data including tasks, responses, messages, and profile photo will be deleted immediately.",
+                    )}
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>{t("Cancel")}</AlertDialogCancel>
+                  <AlertDialogAction
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    onClick={handleDeleteAccount}
+                  >
+                    {t("Delete my account")}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </CardContent>
+        </Card>
       </section>
       <aside className="grid h-fit gap-4 rounded-lg border p-5">
-        <div>
-          <p className="text-sm text-muted-foreground">Public preview</p>
-          <h2 className="mt-1 font-heading text-2xl font-semibold">{profile.name}</h2>
-          <p className="text-sm text-muted-foreground">{profile.location}</p>
+        <div className="flex items-center gap-3">
+          <Avatar className="size-14">
+            <AvatarImage src={profile.avatarUrl ?? ""} alt={profile.name} />
+            <AvatarFallback>{initials}</AvatarFallback>
+          </Avatar>
+          <div>
+            <p className="text-sm text-muted-foreground">{t("Public preview")}</p>
+            <h2 className="font-heading text-xl font-semibold">{profile.name}</h2>
+            <p className="text-sm text-muted-foreground">{profile.location}</p>
+          </div>
         </div>
         <p className="text-sm leading-6">{profile.bio}</p>
         <div className="flex items-center gap-2 text-sm">
           <Star className="size-4 text-primary" />
-          {profile.rating.toFixed(1)} rating
-          <span className="text-muted-foreground">({profile.completedTasks} completed)</span>
+          {profile.rating.toFixed(1)} {t("rating")}
+          <span className="text-muted-foreground">
+            ({profile.completedTasks} {t("completed")})
+          </span>
         </div>
-        <TagGroup label="Skills" items={profile.skills} />
-        <TagGroup label="Interests" items={profile.interests} />
+        <TagGroup label={t("Skills")} items={profile.skills} />
+        <TagGroup label={t("Interests")} items={profile.interests} />
       </aside>
     </div>
   );
@@ -178,7 +327,9 @@ export function PublicProfilePage({ userId }: { userId: string }) {
         }
       } catch (caughtError) {
         if (isActive) {
-          setError(caughtError instanceof Error ? caughtError.message : "Profile failed to load.");
+          setError(
+            caughtError instanceof Error ? caughtError.message : t("Profile failed to load."),
+          );
         }
       } finally {
         if (isActive) {
@@ -194,33 +345,46 @@ export function PublicProfilePage({ userId }: { userId: string }) {
   }, [userId]);
 
   if (isLoading) {
-    return <LoadingState label="Loading profile" />;
+    return <LoadingState label={t("Loading profile")} />;
   }
 
   if (!profile) {
-    return <ErrorState message={error ?? "Profile is unavailable."} />;
+    return <ErrorState message={error ?? t("Profile is unavailable.")} />;
   }
 
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
       <section className="grid gap-5">
-        <div>
-          <h1 className="font-heading text-3xl font-semibold">{profile.name}</h1>
-          <p className="mt-2 text-muted-foreground">{profile.location}</p>
+        <div className="flex items-center gap-4">
+          <Avatar className="size-20">
+            <AvatarImage src={profile.avatarUrl ?? ""} alt={profile.name} />
+            <AvatarFallback className="text-xl">
+              {profile.name
+                .split(" ")
+                .map((w) => w[0])
+                .join("")
+                .slice(0, 2)
+                .toUpperCase()}
+            </AvatarFallback>
+          </Avatar>
+          <div>
+            <h1 className="font-heading text-3xl font-semibold">{profile.name}</h1>
+            <p className="mt-1 text-muted-foreground">{profile.location}</p>
+          </div>
         </div>
         <Card className="rounded-lg">
           <CardHeader>
-            <CardTitle>About</CardTitle>
+            <CardTitle>{t("About")}</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-4">
             <p className="leading-7">{profile.bio}</p>
-            <TagGroup label="Skills" items={profile.skills} />
-            <TagGroup label="Interests" items={profile.interests} />
+            <TagGroup label={t("Skills")} items={profile.skills} />
+            <TagGroup label={t("Interests")} items={profile.interests} />
           </CardContent>
         </Card>
         <Card className="rounded-lg">
           <CardHeader>
-            <CardTitle>Feedback</CardTitle>
+            <CardTitle>{t("Feedback")}</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-3">
             {feedback.length ? (
@@ -234,7 +398,7 @@ export function PublicProfilePage({ userId }: { userId: string }) {
                 </div>
               ))
             ) : (
-              <p className="text-sm text-muted-foreground">No feedback yet.</p>
+              <p className="text-sm text-muted-foreground">{t("No feedback yet.")}</p>
             )}
           </CardContent>
         </Card>
@@ -242,16 +406,18 @@ export function PublicProfilePage({ userId }: { userId: string }) {
       <aside className="grid h-fit gap-4 rounded-lg border p-5">
         <div className="flex items-center gap-2 text-sm">
           <Star className="size-4 text-primary" />
-          {profile.rating.toFixed(1)} rating
+          {profile.rating.toFixed(1)} {t("rating")}
         </div>
-        <p className="text-sm text-muted-foreground">{profile.completedTasks} completed tasks</p>
+        <p className="text-sm text-muted-foreground">
+          {profile.completedTasks} {t("completed tasks")}
+        </p>
         <Badge className="w-fit" variant="outline">
-          {profile.accountStatus}
+          {t(profile.accountStatus)}
         </Badge>
         <Button asChild variant="outline">
           <Link href={`/app/reports/new?reportedUserId=${profile.id}`}>
             <ShieldAlert />
-            Report user
+            {t("Report user")}
           </Link>
         </Button>
       </aside>
@@ -267,7 +433,7 @@ function TagGroup({ label, items }: { label: string; items: string[] }) {
         {items.length ? (
           items.map((item) => <Badge key={item}>{item}</Badge>)
         ) : (
-          <Badge>None yet</Badge>
+          <Badge>{t("None yet")}</Badge>
         )}
       </div>
     </div>

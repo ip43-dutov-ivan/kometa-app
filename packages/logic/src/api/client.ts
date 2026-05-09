@@ -1,9 +1,10 @@
 import type {
-  ApiErrorDto,
   AuthSession,
   BlockUserRequest,
   BlockUserResponse,
+  ChatUnreadSummary,
   CompletionMutationResponse,
+  CompletionRequest,
   CompletionRequestId,
   Conversation,
   ConversationId,
@@ -18,34 +19,41 @@ import type {
   ListMyResponsesQuery,
   ListReportsQuery,
   ListResponse,
+  ListTaskLocationFacetsQuery,
   ListResponsesQuery,
   ListTasksQuery,
   LoginRequest,
   Match,
+  MarkConversationReadResponse,
   Message,
   RaiseCompletionConcernRequest,
   RegisterRequest,
   Report,
   ReportId,
   RequestCompletionRequest,
+  RefreshSessionRequest,
+  RefreshSessionResponse,
   ResponseId,
   SendMessageRequest,
   Task,
   TaskId,
+  TaskLocationFacet,
   TaskResponse,
   UnblockUserResponse,
   UpdateCurrentUserRequest,
   UpdateReportRequest,
-  UpdateTaskRequest,
   User,
   UserFeedbackQuery,
   UserId,
 } from "./dtos";
+import type { ApiErrorDto, KometaApiErrorDetails } from "./errors";
+import { parseApiErrorDetails } from "./errors";
 
 export interface KometaApiClientOptions {
   baseUrl?: string;
   accessToken?: string;
   getAccessToken?: () => string | null | undefined | Promise<string | null | undefined>;
+  refreshAccessToken?: () => string | null | undefined | Promise<string | null | undefined>;
   fetchFn?: typeof fetch;
   defaultHeaders?: HeadersInit;
 }
@@ -61,12 +69,17 @@ type QueryParams = object;
 export class KometaApiError extends Error {
   readonly status: number;
   readonly data?: ApiErrorDto;
+  readonly details: KometaApiErrorDetails;
+  readonly rawData?: unknown;
 
-  constructor(status: number, data?: ApiErrorDto) {
-    super(data?.message ?? `Kometa API request failed with status ${status}`);
+  constructor(status: number, data?: unknown) {
+    const details = parseApiErrorDetails(data, `Kometa API request failed with status ${status}`);
+    super(details.message);
     this.name = "KometaApiError";
     this.status = status;
-    this.data = data;
+    this.data = data as ApiErrorDto | undefined;
+    this.details = details;
+    this.rawData = data;
   }
 }
 
@@ -74,11 +87,17 @@ export interface KometaApiClient {
   auth: {
     register: (body: RegisterRequest, options?: KometaRequestOptions) => Promise<AuthSession>;
     login: (body: LoginRequest, options?: KometaRequestOptions) => Promise<AuthSession>;
+    refresh: (
+      body: RefreshSessionRequest,
+      options?: KometaRequestOptions,
+    ) => Promise<RefreshSessionResponse>;
     logout: (options?: KometaRequestOptions) => Promise<void>;
   };
   users: {
     getMe: (options?: KometaRequestOptions) => Promise<User>;
     updateMe: (body: UpdateCurrentUserRequest, options?: KometaRequestOptions) => Promise<User>;
+    uploadAvatar: (file: File, options?: KometaRequestOptions) => Promise<User>;
+    deleteMe: (options?: KometaRequestOptions) => Promise<void>;
     getById: (userId: UserId, options?: KometaRequestOptions) => Promise<User>;
     listFeedback: (
       userId: UserId,
@@ -88,19 +107,23 @@ export interface KometaApiClient {
   };
   tasks: {
     list: (query?: ListTasksQuery, options?: KometaRequestOptions) => Promise<ListResponse<Task>>;
+    listLocationFacets: (
+      query?: ListTaskLocationFacetsQuery,
+      options?: KometaRequestOptions,
+    ) => Promise<TaskLocationFacet[]>;
     create: (body: CreateTaskRequest, options?: KometaRequestOptions) => Promise<Task>;
     get: (taskId: TaskId, options?: KometaRequestOptions) => Promise<Task>;
-    update: (
-      taskId: TaskId,
-      body: UpdateTaskRequest,
-      options?: KometaRequestOptions,
-    ) => Promise<Task>;
+    delete: (taskId: TaskId, options?: KometaRequestOptions) => Promise<Task>;
     start: (taskId: TaskId, options?: KometaRequestOptions) => Promise<Task>;
     requestCompletion: (
       taskId: TaskId,
       body: RequestCompletionRequest,
       options?: KometaRequestOptions,
     ) => Promise<CompletionMutationResponse>;
+    listCompletionRequests: (
+      taskId: TaskId,
+      options?: KometaRequestOptions,
+    ) => Promise<CompletionRequest[]>;
     confirmCompletion: (
       taskId: TaskId,
       requestId: CompletionRequestId,
@@ -156,7 +179,12 @@ export interface KometaApiClient {
       conversationId: ConversationId,
       query?: ListMessagesQuery,
       options?: KometaRequestOptions,
-    ) => Promise<Message[]>;
+    ) => Promise<ListResponse<Message>>;
+    getUnreadSummary: (options?: KometaRequestOptions) => Promise<ChatUnreadSummary>;
+    markRead: (
+      conversationId: ConversationId,
+      options?: KometaRequestOptions,
+    ) => Promise<MarkConversationReadResponse>;
     sendMessage: (
       conversationId: ConversationId,
       body: SendMessageRequest,
@@ -208,6 +236,28 @@ export function createKometaApiClient(options: KometaApiClientOptions = {}): Kom
       headers: buildHeaders(options.defaultHeaders, init.headers, token),
     });
 
+    if (response.status === 401 && options.refreshAccessToken) {
+      const refreshedToken = await options.refreshAccessToken();
+
+      if (refreshedToken && refreshedToken !== token) {
+        const retryResponse = await fetchImpl(`${baseUrl}${path}`, {
+          ...init,
+          signal: requestOptions.signal ?? init.signal,
+          headers: buildHeaders(options.defaultHeaders, init.headers, refreshedToken),
+        });
+
+        if (retryResponse.ok) {
+          if (retryResponse.status === 204) {
+            return undefined as TResponse;
+          }
+
+          return (await retryResponse.json()) as TResponse;
+        }
+
+        throw new KometaApiError(retryResponse.status, await readError(retryResponse));
+      }
+    }
+
     if (!response.ok) {
       throw new KometaApiError(response.status, await readError(response));
     }
@@ -234,30 +284,87 @@ export function createKometaApiClient(options: KometaApiClientOptions = {}): Kom
     body: unknown,
     options?: KometaRequestOptions,
   ): Promise<TResponse> => request<TResponse>(path, withJsonBody("PATCH", body), options);
+  const del = <TResponse>(path: string, options?: KometaRequestOptions): Promise<TResponse> =>
+    request<TResponse>(path, { method: "DELETE" }, options);
+
+  const postFormData = async <TResponse>(
+    path: string,
+    formData: FormData,
+    requestOptions: KometaRequestOptions = {},
+  ): Promise<TResponse> => {
+    const token =
+      requestOptions.accessToken ??
+      options.accessToken ??
+      (options.getAccessToken ? await options.getAccessToken() : undefined);
+
+    const makeHeaders = (t: string | null | undefined) => {
+      const h = new Headers(options.defaultHeaders);
+      h.set("Accept", "application/json");
+      if (t) h.set("Authorization", `Bearer ${t}`);
+      return h;
+    };
+
+    const doFetch = (t: string | null | undefined) =>
+      fetchImpl(`${baseUrl}${path}`, {
+        method: "POST",
+        body: formData,
+        headers: makeHeaders(t),
+        signal: requestOptions.signal,
+      });
+
+    const response = await doFetch(token);
+
+    if (response.status === 401 && options.refreshAccessToken) {
+      const refreshedToken = await options.refreshAccessToken();
+      if (refreshedToken && refreshedToken !== token) {
+        const retryResponse = await doFetch(refreshedToken);
+        if (retryResponse.ok) return (await retryResponse.json()) as TResponse;
+        throw new KometaApiError(retryResponse.status, await readError(retryResponse));
+      }
+    }
+
+    if (!response.ok) throw new KometaApiError(response.status, await readError(response));
+    return (await response.json()) as TResponse;
+  };
 
   return {
     auth: {
       register: (body, options) => post<AuthSession>("/auth/register", body, options),
       login: (body, options) => post<AuthSession>("/auth/login", body, options),
+      refresh: (body, options) => post<RefreshSessionResponse>("/auth/refresh", body, options),
       logout: (options) => post<void>("/auth/logout", undefined, options),
     },
     users: {
       getMe: (options) => get<User>("/users/me", undefined, options),
       updateMe: (body, options) => patch<User>("/users/me", body, options),
+      uploadAvatar: (file, options) => {
+        const formData = new FormData();
+        formData.append("file", file);
+        return postFormData<User>("/users/upload-avatar", formData, options);
+      },
+      deleteMe: (options) => del<void>("/users/me", options),
       getById: (userId, options) => get<User>(`/users/${segment(userId)}`, undefined, options),
       listFeedback: (userId, query, options) =>
         get<ListResponse<Feedback>>(`/users/${segment(userId)}/feedback`, query, options),
     },
     tasks: {
       list: (query, options) => get<ListResponse<Task>>("/tasks", query, options),
+      listLocationFacets: (query, options) =>
+        get<TaskLocationFacet[]>("/tasks/location-facets", query, options),
       create: (body, options) => post<Task>("/tasks", body, options),
       get: (taskId, options) => get<Task>(`/tasks/${segment(taskId)}`, undefined, options),
-      update: (taskId, body, options) => patch<Task>(`/tasks/${segment(taskId)}`, body, options),
+      delete: (taskId, options) => del<Task>(`/tasks/${segment(taskId)}`, options),
       start: (taskId, options) => post<Task>(`/tasks/${segment(taskId)}/start`, undefined, options),
       requestCompletion: (taskId, body, options) =>
         post<CompletionMutationResponse>(
           `/tasks/${segment(taskId)}/completion-requests`,
           body,
+          options,
+        ),
+      listCompletionRequests: (taskId, options) =>
+        get<CompletionRequest[]>(
+          `/tasks/${segment(taskId)}/completion-requests`,
+          undefined,
           options,
         ),
       confirmCompletion: (taskId, requestId, options) =>
@@ -299,7 +406,18 @@ export function createKometaApiClient(options: KometaApiClientOptions = {}): Kom
       get: (conversationId, options) =>
         get<Conversation>(`/conversations/${segment(conversationId)}`, undefined, options),
       listMessages: (conversationId, query, options) =>
-        get<Message[]>(`/conversations/${segment(conversationId)}/messages`, query, options),
+        get<ListResponse<Message>>(
+          `/conversations/${segment(conversationId)}/messages`,
+          query,
+          options,
+        ),
+      getUnreadSummary: (options) => get<ChatUnreadSummary>("/me/chat-summary", undefined, options),
+      markRead: (conversationId, options) =>
+        post<MarkConversationReadResponse>(
+          `/conversations/${segment(conversationId)}/read`,
+          undefined,
+          options,
+        ),
       sendMessage: (conversationId, body, options) =>
         post<Message>(`/conversations/${segment(conversationId)}/messages`, body, options),
     },
@@ -388,9 +506,9 @@ function isQueryValue(value: unknown): value is Exclude<QueryValue, null | undef
   return valueType === "string" || valueType === "number" || valueType === "boolean";
 }
 
-async function readError(response: Response): Promise<ApiErrorDto | undefined> {
+async function readError(response: Response): Promise<unknown> {
   try {
-    return (await response.json()) as ApiErrorDto;
+    return await response.json();
   } catch (_error) {
     return undefined;
   }

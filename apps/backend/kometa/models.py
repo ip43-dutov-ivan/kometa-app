@@ -62,7 +62,13 @@ class Task(models.Model):
     title = models.CharField(max_length=255)
     description = models.TextField()
     category = models.CharField(max_length=100)
-    location = models.CharField(max_length=255)
+    location_label = models.CharField(max_length=255)
+    location_latitude = models.FloatField(null=True, blank=True)
+    location_longitude = models.FloatField(null=True, blank=True)
+    location_is_remote = models.BooleanField(default=False)
+    location_city_id = models.CharField(max_length=255, blank=True)
+    location_city_label = models.CharField(max_length=255, blank=True)
+    location_country_code = models.CharField(max_length=2, blank=True)
     compensation = models.JSONField()  # { "type": "money", "amount": 350, "currency": "UAH" }
     status = models.CharField(max_length=20, choices=TASK_STATUS_CHOICES, default='open')
     owner = models.ForeignKey(User, related_name='tasks_owned', on_delete=models.CASCADE)
@@ -173,6 +179,27 @@ class ConversationMessage(models.Model):
 
     def __str__(self):
         return f'Message from {self.sender_id} in {self.conversation_id}'
+
+
+class ConversationReadState(models.Model):
+    conversation = models.ForeignKey(
+        Conversation,
+        related_name='read_states',
+        on_delete=models.CASCADE,
+    )
+    user = models.ForeignKey(
+        User,
+        related_name='conversation_read_states',
+        on_delete=models.CASCADE,
+    )
+    last_read_at = models.DateTimeField()
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = [('conversation', 'user')]
+
+    def __str__(self):
+        return f'Read state for user {self.user_id} in conversation {self.conversation_id}'
 
 
 class Match(models.Model):

@@ -6,6 +6,7 @@ This is a polyglot monorepo.
 - `apps/mobile/`: Expo React Native app.
 - `apps/backend/`: Django Python API.
 - `packages/logic/`: Shared TypeScript logic, API clients, DTOs, validation helpers, and cross-platform Zustand stores.
+- `packages/i18n/`: Shared locale metadata and Lingui message catalogs for cross-platform product copy.
 - `packages/mocks/`: Shared MSW fake backend for frontend-first development, demos, and tests.
 
 ## Global Boundaries
@@ -13,7 +14,9 @@ This is a polyglot monorepo.
 - Do not mix mobile and web UI components.
 - Do not import from `apps/web` into `apps/mobile`, or from `apps/mobile` into `apps/web`.
 - Do not import app-specific code into `packages/logic`.
+- Do not import app-specific code into `packages/i18n`.
 - Put cross-platform business logic in `packages/logic`.
+- Put shared locale metadata and cross-platform product copy in `packages/i18n`.
 - Put mock backend behavior and fake API fixtures in `packages/mocks`.
 - Put web-only UI and browser behavior in `apps/web`.
 - Put mobile-only UI and native behavior in `apps/mobile`.
@@ -27,6 +30,7 @@ Use the closest `AGENTS.md` file for detailed rules:
 - `apps/mobile/AGENTS.md`: Expo and React Native app rules.
 - `apps/backend/AGENTS.md`: Django API rules.
 - `packages/logic/AGENTS.md`: shared TypeScript logic, API clients, DTOs, and cross-platform stores.
+- `packages/i18n/AGENTS.md`: shared locale metadata and Lingui message catalogs.
 - `packages/mocks/AGENTS.md`: shared MSW handlers, fixtures, and mock scenarios.
 
 ## Cross-Cutting Workflow

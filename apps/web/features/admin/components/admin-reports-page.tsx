@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { t } from "@kometa/i18n";
 import type { Report, ReportStatus } from "@kometa/logic";
 import { kometaApi } from "@/shared/api/client";
 import { EmptyState, ErrorState, LoadingState } from "@/shared/components/page-state";
@@ -24,7 +25,7 @@ export function AdminReportsPage() {
       const response = await kometaApi.admin.listReports(status === "all" ? undefined : { status });
       setReports(response.items);
     } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : "Reports failed to load.");
+      setError(caughtError instanceof Error ? caughtError.message : t("Reports failed to load."));
     } finally {
       setIsLoading(false);
     }
@@ -37,8 +38,8 @@ export function AdminReportsPage() {
   return (
     <div className="grid gap-5">
       <div>
-        <h1 className="font-heading text-3xl font-semibold">Reports queue</h1>
-        <p className="mt-2 text-muted-foreground">Manual review surface for MVP support.</p>
+        <h1 className="font-heading text-3xl font-semibold">{t("Reports queue")}</h1>
+        <p className="mt-2 text-muted-foreground">{t("Manual review surface for MVP support.")}</p>
       </div>
       <div className="flex flex-wrap gap-2">
         {statuses.map((item) => (
@@ -48,38 +49,46 @@ export function AdminReportsPage() {
             size="sm"
             onClick={() => setStatus(item)}
           >
-            {item}
+            {t(item)}
           </Button>
         ))}
       </div>
       {error ? <ErrorState message={error} /> : null}
       {isLoading ? (
-        <LoadingState label="Loading reports" />
+        <LoadingState label={t("Loading reports")} />
       ) : reports.length ? (
         <div className="grid gap-4 md:grid-cols-2">
           {reports.map((report) => (
             <Card key={report.id} className="rounded-lg">
               <CardHeader>
                 <Badge className="w-fit" variant="outline">
-                  {report.status}
+                  {t(report.status)}
                 </Badge>
                 <CardTitle className="text-xl">{report.reason}</CardTitle>
               </CardHeader>
               <CardContent className="grid gap-1 text-sm text-muted-foreground">
-                <span>Reporter: {report.reporterId}</span>
-                <span>Reported: {report.reportedUserId}</span>
-                {report.taskId ? <span>Task: {report.taskId}</span> : null}
+                <span>
+                  {t("Reporter")}: {report.reporterId}
+                </span>
+                <span>
+                  {t("Reported")}: {report.reportedUserId}
+                </span>
+                {report.taskId ? (
+                  <span>
+                    {t("Task")}: {report.taskId}
+                  </span>
+                ) : null}
               </CardContent>
               <CardFooter>
                 <Button asChild variant="outline" className="w-full">
-                  <Link href={`/admin/reports/${report.id}`}>Review</Link>
+                  <Link href={`/admin/reports/${report.id}`}>{t("Review")}</Link>
                 </Button>
               </CardFooter>
             </Card>
           ))}
         </div>
       ) : (
-        <EmptyState title="No reports" body="Try another status filter." />
+        <EmptyState title={t("No reports")} body={t("Try another status filter.")} />
       )}
     </div>
   );

@@ -1,9 +1,14 @@
+import re
+import unicodedata
+
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 from django.contrib.auth import authenticate
-from .models import CompletionRequest, Conversation, ConversationMessage, Feedback, Match, Report, Task, TaskResponse, User
+from django.core.exceptions import ValidationError as DjangoValidationError
+from .models import CompletionRequest, Conversation, ConversationMessage, ConversationReadState, Feedback, Match, Report, Task, TaskResponse, User
 
 class UserSerializer(serializers.ModelSerializer):
+    id = serializers.CharField(read_only=True)
     completedTasks = serializers.IntegerField(source='completed_tasks', read_only=True)
     accountStatus = serializers.CharField(source='account_status', read_only=True)
     avatarUrl = serializers.URLField(source='avatar_url', allow_blank=True, required=False)
@@ -80,6 +85,7 @@ class TaskSerializer(serializers.ModelSerializer):
     selectedResponseId = serializers.CharField(source='selected_response_id', read_only=True, allow_null=True)
     createdAt = serializers.DateTimeField(source='created_at', read_only=True)
     updatedAt = serializers.DateTimeField(source='updated_at', read_only=True)
+    location = serializers.DictField(write_only=True)
 
     class Meta:
         model = Task
@@ -88,6 +94,105 @@ class TaskSerializer(serializers.ModelSerializer):
             'status', 'ownerId', 'selectedResponseId', 'createdAt', 'updatedAt'
         ]
         read_only_fields = ['id', 'status', 'ownerId', 'selectedResponseId', 'createdAt', 'updatedAt']
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        location = {
+            'label': instance.location_label,
+            'isRemote': instance.location_is_remote,
+        }
+        if instance.location_latitude is not None:
+            location['latitude'] = instance.location_latitude
+        if instance.location_longitude is not None:
+            location['longitude'] = instance.location_longitude
+        if instance.location_city_id:
+            location['cityId'] = instance.location_city_id
+        if instance.location_city_label:
+            location['cityLabel'] = instance.location_city_label
+        if instance.location_country_code:
+            location['countryCode'] = instance.location_country_code
+        data['location'] = location
+        return data
+
+    def validate_location(self, value):
+        if not isinstance(value, dict):
+            raise serializers.ValidationError('Location must be an object.')
+
+        label = str(value.get('label', '')).strip()
+        if not label:
+            raise serializers.ValidationError({'label': 'Location label is required.'})
+
+        is_remote = bool(value.get('isRemote', False))
+        if is_remote:
+            return {
+                'label': label,
+                'isRemote': True,
+                'latitude': None,
+                'longitude': None,
+                'cityId': 'remote',
+                'cityLabel': 'Remote',
+                'countryCode': '',
+            }
+
+        latitude = value.get('latitude')
+        longitude = value.get('longitude')
+        if latitude is None:
+            raise serializers.ValidationError({'latitude': 'Latitude is required for physical locations.'})
+        if longitude is None:
+            raise serializers.ValidationError({'longitude': 'Longitude is required for physical locations.'})
+
+        try:
+            latitude = float(latitude)
+            longitude = float(longitude)
+        except (TypeError, ValueError):
+            raise serializers.ValidationError('Latitude and longitude must be numbers.')
+
+        if latitude < -90 or latitude > 90:
+            raise serializers.ValidationError({'latitude': 'Latitude must be between -90 and 90.'})
+        if longitude < -180 or longitude > 180:
+            raise serializers.ValidationError({'longitude': 'Longitude must be between -180 and 180.'})
+
+        city_label = str(value.get('cityLabel', '')).strip() or label.split(',')[0].strip()
+        country_code = str(value.get('countryCode', '')).strip().upper()[:2]
+
+        return {
+            'label': label,
+            'isRemote': False,
+            'latitude': latitude,
+            'longitude': longitude,
+            'cityId': str(value.get('cityId', '')).strip() or self.get_fallback_city_id(city_label, country_code),
+            'cityLabel': city_label,
+            'countryCode': country_code,
+        }
+
+    def create(self, validated_data):
+        location = validated_data.pop('location')
+        self.apply_location(validated_data, location)
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        location = validated_data.pop('location', None)
+        if location is not None:
+            self.apply_location(validated_data, location)
+        return super().update(instance, validated_data)
+
+    def apply_location(self, data, location):
+        data['location_label'] = location['label']
+        data['location_is_remote'] = location['isRemote']
+        data['location_latitude'] = location['latitude']
+        data['location_longitude'] = location['longitude']
+        data['location_city_id'] = location['cityId']
+        data['location_city_label'] = location['cityLabel']
+        data['location_country_code'] = location['countryCode']
+
+    def get_fallback_city_id(self, city_label, country_code):
+        normalized = unicodedata.normalize('NFKD', city_label)
+        ascii_value = normalized.encode('ascii', 'ignore').decode('ascii')
+        city_slug = re.sub(r'[^a-z0-9]+', '-', ascii_value.lower()).strip('-')
+        if not city_slug:
+            return ''
+
+        return f'{country_code.lower() if country_code else "place"}-{city_slug}'
 
     def validate_compensation(self, value):
         if not isinstance(value, dict):
@@ -141,14 +246,50 @@ class CompletionRequestSerializer(serializers.ModelSerializer):
 
 class ConversationSerializer(serializers.ModelSerializer):
     taskId = serializers.CharField(source='task_id', read_only=True)
-    participantIds = serializers.ListField(source='participant_ids', child=serializers.IntegerField(), read_only=True)
+    participantIds = serializers.SerializerMethodField()
     lastMessageAt = serializers.DateTimeField(source='last_message_at', read_only=True)
     createdAt = serializers.DateTimeField(source='created_at', read_only=True)
+    unreadCount = serializers.SerializerMethodField()
+    readStates = serializers.SerializerMethodField()
 
     class Meta:
         model = Conversation
-        fields = ['id', 'taskId', 'participantIds', 'lastMessageAt', 'createdAt']
-        read_only_fields = ['id', 'taskId', 'participantIds', 'lastMessageAt', 'createdAt']
+        fields = ['id', 'taskId', 'participantIds', 'lastMessageAt', 'createdAt', 'unreadCount', 'readStates']
+        read_only_fields = ['id', 'taskId', 'participantIds', 'lastMessageAt', 'createdAt', 'unreadCount', 'readStates']
+
+    def get_unreadCount(self, instance):
+        request = self.context.get('request')
+        if not request or not request.user or not request.user.is_authenticated:
+            return 0
+
+        queryset = instance.messages.exclude(sender_id=request.user.id)
+        read_state = ConversationReadState.objects.filter(
+            conversation=instance,
+            user=request.user,
+        ).first()
+        if read_state:
+            queryset = queryset.filter(created_at__gt=read_state.last_read_at)
+
+        return queryset.count()
+
+    def get_participantIds(self, instance):
+        return [str(participant_id) for participant_id in instance.participant_ids]
+
+    def get_readStates(self, instance):
+        request = self.context.get('request')
+        if not request or not request.user or not request.user.is_authenticated:
+            return []
+        if request.user.id not in instance.participant_ids:
+            return []
+
+        return [
+            {
+                'userId': str(read_state.user_id),
+                'lastReadAt': serializers.DateTimeField().to_representation(read_state.last_read_at),
+            }
+            for read_state in instance.read_states.all()
+            if read_state.user_id in instance.participant_ids
+        ]
 
 
 class ConversationMessageSerializer(serializers.ModelSerializer):
@@ -201,6 +342,20 @@ class ReportSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError({'reportedUserId': 'This field is required.'})
             if 'reason' not in data:
                 raise serializers.ValidationError({'reason': 'This field is required.'})
+
+            request = self.context.get('request')
+            reported_user_id = data.get('reported_user_id')
+            if request and reported_user_id and str(reported_user_id) == str(request.user.id):
+                raise serializers.ValidationError({'reportedUserId': 'Users cannot report themselves.'})
+
+            task_id = data.get('task_id')
+            if task_id:
+                try:
+                    task_exists = Task.objects.filter(id=task_id).exists()
+                except (ValueError, DjangoValidationError):
+                    task_exists = False
+                if not task_exists:
+                    raise serializers.ValidationError({'taskId': 'Task not found.'})
         return data
 
     def create(self, validated_data):

@@ -1,4 +1,5 @@
 import logo from "@kometa/assets/logo.svg";
+import { t } from "@kometa/i18n";
 import Image from "next/image";
 import Link from "next/link";
 
@@ -24,7 +25,7 @@ export function BrandLockup({ className, iconClassName, textClassName }: BrandLo
           textClassName ?? ""
         }`}
       >
-        Kometa
+        {t("Kometa")}
       </span>
     </Link>
   );

@@ -36,6 +36,10 @@ export function error(
   return HttpResponse.json<ApiError>({ code, message, details }, { status });
 }
 
+export function drfError(errors: Record<string, string | string[]>, status = 400) {
+  return HttpResponse.json(errors, { status });
+}
+
 export function getCurrentUser(): UserProfile {
   const user = users.find((item) => item.id === currentUserId);
 
