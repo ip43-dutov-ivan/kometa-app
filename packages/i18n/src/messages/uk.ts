@@ -366,4 +366,25 @@ export const messages = {
     "Відгуки на завдання, збіги та чати в одному місці.",
   Unread: "Непрочитані",
   Updated: "Оновлено",
+  "Add your name and a profile photo.": "Додайте ім'я та фото профілю.",
+  Avatar: "Аватар",
+  "Click to add an avatar": "Натисніть, щоб додати аватар",
+  Finish: "Завершити",
+  "Let's set up your profile.": "Давайте налаштуємо ваш профіль.",
+  "Next step": "Наступний крок",
+  "Previous step": "Попередній крок",
+  "Profile setup failed.": "Не вдалося налаштувати профіль.",
+  Skip: "Пропустити",
+  "Skip and finish": "Пропустити та завершити",
+  "Skills help task owners find the right person.":
+    "Навички допомагають власникам завдань знайти потрібну людину.",
+  "Tell others what you do and what you're interested in…":
+    "Розкажіть іншим, чим ви займаєтесь та що вас цікавить…",
+  "Tell your story": "Розкажіть про себе",
+  "Welcome to Kometa": "Ласкаво просимо до Kometa",
+  "What are you good at?": "У чому ви сильні?",
+  "Who are you?": "Хто ви?",
+  "Write a short bio so others know what you're about.":
+    "Напишіть коротке біо, щоб інші знали, хто ви.",
+  "Your full name": "Ваше повне ім'я",
 } as const satisfies Messages;

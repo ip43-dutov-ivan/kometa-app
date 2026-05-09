@@ -175,9 +175,9 @@ export interface RefreshSessionResponse {
 export interface RegisterRequest {
   email: string;
   password: string;
-  name: string;
-  location: string;
-  bio: string;
+  name?: string;
+  location?: string;
+  bio?: string;
 }
 
 export interface LoginRequest {

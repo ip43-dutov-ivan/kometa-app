@@ -13,7 +13,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 
 type AuthMode = "login" | "register";
 
@@ -38,9 +37,6 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
         ? await kometaUnauthenticatedApi.auth.register({
             email: String(formData.get("email") ?? ""),
             password: String(formData.get("password") ?? ""),
-            name: String(formData.get("name") ?? ""),
-            location: String(formData.get("location") ?? ""),
-            bio: String(formData.get("bio") ?? ""),
           })
         : await kometaUnauthenticatedApi.auth.login({
             email: String(formData.get("email") ?? ""),
@@ -48,7 +44,7 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
           });
 
       setSession(session);
-      router.push("/app");
+      router.push(isRegister ? "/app/onboarding" : "/app");
     } catch (caughtError) {
       const nextFieldErrors = getApiFieldErrors(caughtError);
       const hasFieldErrors = Object.keys(nextFieldErrors).length > 0;
@@ -78,7 +74,7 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
             </CardTitle>
             <CardDescription>
               {isRegister
-                ? t("Set up your profile and start using Kometa.")
+                ? t("Enter your email and password to get started.")
                 : t("Access your tasks, responses, and profile.")}
             </CardDescription>
           </CardHeader>
@@ -101,25 +97,6 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
                 />
                 <FieldError messages={fieldErrors.password} />
               </div>
-              {isRegister ? (
-                <>
-                  <div className="grid gap-2">
-                    <Label htmlFor="name">{t("Name")}</Label>
-                    <Input id="name" name="name" autoComplete="name" required />
-                    <FieldError messages={fieldErrors.name} />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="location">{t("Location")}</Label>
-                    <Input id="location" name="location" autoComplete="address-level2" required />
-                    <FieldError messages={fieldErrors.location} />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="bio">{t("Bio")}</Label>
-                    <Textarea id="bio" name="bio" rows={4} required />
-                    <FieldError messages={fieldErrors.bio} />
-                  </div>
-                </>
-              ) : null}
               <Button type="submit" disabled={isSubmitting}>
                 {isRegister ? <UserPlus /> : <LogIn />}
                 {isSubmitting ? t("Submitting") : isRegister ? t("Register") : t("Log in")}

@@ -77,6 +77,15 @@ export function AppShell({ children }: { children: ReactNode }) {
   }, [hasHydrated, isAuthenticated, router]);
 
   useEffect(() => {
+    if (!hasHydrated || !isAuthenticated || !user) return;
+    const done =
+      localStorage.getItem(`kometa.onboarding.done.${user.id}`) === "1" || Boolean(user.name);
+    if (!done && pathname !== "/app/onboarding") {
+      router.replace("/app/onboarding");
+    }
+  }, [hasHydrated, isAuthenticated, user, pathname, router]);
+
+  useEffect(() => {
     if (!hasHydrated || !isAuthenticated) {
       chatRealtimeStore.getState().setUnreadCounts({});
       setPendingOwnerResponseCount(0);
@@ -153,6 +162,25 @@ export function AppShell({ children }: { children: ReactNode }) {
   }
 
   if (!hasHydrated || !isAuthenticated) {
+    return <LoadingState label={t("Checking session")} />;
+  }
+
+  const isOnboardingRoute = pathname === "/app/onboarding";
+  const hasDoneOnboarding =
+    !user ||
+    localStorage.getItem(`kometa.onboarding.done.${user.id}`) === "1" ||
+    Boolean(user.name);
+
+  if (isOnboardingRoute) {
+    return (
+      <>
+        {children}
+        <Toaster closeButton position="top-right" />
+      </>
+    );
+  }
+
+  if (!hasDoneOnboarding) {
     return <LoadingState label={t("Checking session")} />;
   }
 

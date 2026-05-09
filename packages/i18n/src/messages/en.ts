@@ -365,4 +365,25 @@ export const messages = {
     "Task responses, matches, and chats in one place.",
   Unread: "Unread",
   Updated: "Updated",
+  "Add your name and a profile photo.": "Add your name and a profile photo.",
+  Avatar: "Avatar",
+  "Click to add an avatar": "Click to add an avatar",
+  Finish: "Finish",
+  "Let's set up your profile.": "Let's set up your profile.",
+  "Next step": "Next step",
+  "Previous step": "Previous step",
+  "Profile setup failed.": "Profile setup failed.",
+  Skip: "Skip",
+  "Skip and finish": "Skip and finish",
+  "Skills help task owners find the right person.":
+    "Skills help task owners find the right person.",
+  "Tell others what you do and what you're interested in…":
+    "Tell others what you do and what you're interested in…",
+  "Tell your story": "Tell your story",
+  "Welcome to Kometa": "Welcome to Kometa",
+  "What are you good at?": "What are you good at?",
+  "Who are you?": "Who are you?",
+  "Write a short bio so others know what you're about.":
+    "Write a short bio so others know what you're about.",
+  "Your full name": "Your full name",
 } as const;
