@@ -12,14 +12,17 @@ class UserSerializer(serializers.ModelSerializer):
     completedTasks = serializers.IntegerField(source='completed_tasks', read_only=True)
     accountStatus = serializers.CharField(source='account_status', read_only=True)
     avatarUrl = serializers.URLField(source='avatar_url', allow_blank=True, required=False)
+    creditBalance = serializers.IntegerField(source='credit_balance', read_only=True)
+    creditReserved = serializers.IntegerField(source='credit_reserved', read_only=True)
 
     class Meta:
         model = User
         fields = [
             'id', 'name', 'location', 'bio', 'skills', 'interests',
-            'rating', 'completedTasks', 'accountStatus', 'avatarUrl'
+            'rating', 'completedTasks', 'accountStatus', 'avatarUrl',
+            'creditBalance', 'creditReserved'
         ]
-        read_only_fields = ['id', 'rating', 'completedTasks', 'accountStatus']
+        read_only_fields = ['id', 'rating', 'completedTasks', 'accountStatus', 'creditBalance', 'creditReserved']
 
 class FeedbackSerializer(serializers.ModelSerializer):
     authorId = serializers.CharField(source='author_id', read_only=True)
@@ -43,6 +46,9 @@ class RegisterSerializer(serializers.ModelSerializer):
         ],
     )
     password = serializers.CharField(write_only=True, min_length=8)
+    name = serializers.CharField(required=False, allow_blank=True, default='')
+    location = serializers.CharField(required=False, allow_blank=True, default='')
+    bio = serializers.CharField(required=False, allow_blank=True, default='')
 
     class Meta:
         model = User
@@ -50,11 +56,11 @@ class RegisterSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         user = User.objects.create_user(
-            username=validated_data['email'],  # use email as username
+            username=validated_data['email'],
             email=validated_data['email'],
             password=validated_data['password'],
-            name=validated_data['name'],
-            location=validated_data['location'],
+            name=validated_data.get('name', ''),
+            location=validated_data.get('location', ''),
             bio=validated_data.get('bio', ''),
         )
         return user
@@ -198,16 +204,14 @@ class TaskSerializer(serializers.ModelSerializer):
         if not isinstance(value, dict):
             raise serializers.ValidationError('Compensation must be an object.')
 
-        if value.get('type') != 'money':
-            raise serializers.ValidationError('Compensation type must be "money".')
-        if value.get('currency') != 'UAH':
-            raise serializers.ValidationError('Compensation currency must be "UAH".')
+        if value.get('type') != 'credits':
+            raise serializers.ValidationError('Compensation type must be "credits".')
 
         amount = value.get('amount')
-        if amount is None or not isinstance(amount, (int, float)) or amount <= 0:
-            raise serializers.ValidationError('Compensation amount must be a positive number.')
+        if amount is None or not isinstance(amount, int) or isinstance(amount, bool) or amount <= 0:
+            raise serializers.ValidationError('Compensation amount must be a positive integer.')
 
-        return value
+        return {'type': 'credits', 'amount': amount}
 
 
 class TaskResponseSerializer(serializers.ModelSerializer):

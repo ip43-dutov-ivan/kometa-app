@@ -280,7 +280,7 @@ export function TaskDetailPage({
           <div>
             <p className="text-sm text-muted-foreground">{t("Compensation")}</p>
             <p className="font-heading text-2xl font-semibold">
-              {task.compensation.amount} {task.compensation.currency}
+              {task.compensation.amount} {t("credits")}
             </p>
           </div>
           <div className="grid gap-2 text-sm">

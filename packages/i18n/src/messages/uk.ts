@@ -49,7 +49,15 @@ export const messages = {
   "Completion request id is required by the API contract.":
     "За контрактом API потрібен ID запиту на завершення.",
   Compensation: "Оплата",
-  "Compensation, UAH": "Оплата, грн",
+  "Available credits": "Доступні кредити",
+  credits: "кредитів",
+  "Describe the help you need and set a credit reward.":
+    "Опишіть, яка допомога потрібна, і вкажіть винагороду в кредитах.",
+  "Enter a positive credit reward.": "Вкажіть додатну винагороду в кредитах.",
+  reserved: "зарезервовано",
+  "Reward, credits": "Винагорода, кредити",
+  "You do not have enough available credits for this reward.":
+    "У вас недостатньо доступних кредитів для цієї винагороди.",
   "Complex portfolios required": "Потрібні складні портфоліо",
   "Concern reason": "Причина зауваження",
   "Connect and coordinate the details": "Зв'яжіться та узгодьте деталі",
@@ -79,8 +87,6 @@ export const messages = {
   "Delete this task?": "Видалити це завдання?",
   Description: "Опис",
   Discover: "Пошук",
-  "Describe the help you need and set compensation.":
-    "Опишіть, яка допомога потрібна, і вкажіть оплату.",
   "Displays the mobile sidebar.": "Показує мобільну бічну панель.",
   "Duplicate task": "Дублювати завдання",
   Email: "Ел. пошта",

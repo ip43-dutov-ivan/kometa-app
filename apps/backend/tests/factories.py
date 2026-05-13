@@ -23,9 +23,8 @@ def task_payload(**overrides):
             'isRemote': True,
         },
         'compensation': {
-            'type': 'money',
-            'amount': 500,
-            'currency': 'UAH',
+            'type': 'credits',
+            'amount': 25,
         },
     }
     payload.update(overrides)
@@ -45,4 +44,10 @@ def create_task(owner, **overrides):
         'location_city_label': location.get('cityLabel', 'Remote' if location.get('isRemote', False) else ''),
         'location_country_code': location.get('countryCode', ''),
     })
-    return Task.objects.create(owner=owner, **defaults)
+    task = Task.objects.create(owner=owner, **defaults)
+    amount = defaults.get('compensation', {}).get('amount')
+    if defaults.get('compensation', {}).get('type') == 'credits' and task.status not in ['completed', 'cancelled']:
+        owner.credit_balance -= amount
+        owner.credit_reserved += amount
+        owner.save(update_fields=['credit_balance', 'credit_reserved'])
+    return task

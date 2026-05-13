@@ -9,6 +9,7 @@ import {
   ChevronDown,
   ClipboardList,
   Compass,
+  Coins,
   Languages,
   LogOut,
   Menu,
@@ -66,7 +67,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
   const [pendingOwnerResponseCount, setPendingOwnerResponseCount] = useState(0);
-  const { hasHydrated, isAuthenticated, user, clearSession } = useKometaSession();
+  const { hasHydrated, isAuthenticated, user, clearSession, setUser } = useKometaSession();
   const totalUnreadChatCount = useStore(chatRealtimeStore, selectTotalUnreadChatCount);
   const inboxNotificationCount = totalUnreadChatCount + pendingOwnerResponseCount;
 
@@ -126,6 +127,31 @@ export function AppShell({ children }: { children: ReactNode }) {
       isActive = false;
     };
   }, [hasHydrated, isAuthenticated, pathname]);
+
+  useEffect(() => {
+    if (!hasHydrated || !isAuthenticated) {
+      return;
+    }
+
+    let isActive = true;
+
+    async function loadCurrentUser() {
+      try {
+        const nextUser = await kometaApi.users.getMe();
+        if (isActive) {
+          setUser(nextUser);
+        }
+      } catch {
+        // Keep the hydrated session user if profile refresh fails.
+      }
+    }
+
+    loadCurrentUser();
+
+    return () => {
+      isActive = false;
+    };
+  }, [hasHydrated, isAuthenticated, pathname, setUser]);
 
   useEffect(() => {
     if (!hasHydrated || !isAuthenticated) {
@@ -230,6 +256,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <LocaleSwitch className="mb-3" />
             <div className="mb-3 min-w-0 px-3">
               <div className="truncate text-sm font-medium">{user?.name}</div>
+              {user ? <CreditSummary user={user} compact /> : null}
             </div>
             <Button variant="outline" className="w-full justify-start" onClick={logout}>
               <LogOut />
@@ -244,7 +271,12 @@ export function AppShell({ children }: { children: ReactNode }) {
               <Link href="/app/tasks" className="font-heading text-lg font-semibold">
                 {t("Kometa")}
               </Link>
-              <span className="max-w-44 truncate text-sm text-muted-foreground">{user?.name}</span>
+              <div className="flex min-w-0 items-center gap-3">
+                {user ? <CreditSummary user={user} compact /> : null}
+                <span className="max-w-32 truncate text-sm text-muted-foreground">
+                  {user?.name}
+                </span>
+              </div>
             </div>
           </header>
 
@@ -300,6 +332,12 @@ export function AppShell({ children }: { children: ReactNode }) {
               <div className="grid gap-2 px-4">
                 <ThemeSwitch id="mobile-theme-switch" className="mb-1" />
                 <LocaleSwitch className="mb-1" />
+                {user ? (
+                  <div className="mb-1 rounded-md border bg-background px-3 py-2">
+                    <div className="truncate text-sm font-medium">{user.name}</div>
+                    <CreditSummary user={user} />
+                  </div>
+                ) : null}
                 {secondaryNavItems.map((item) => (
                   <SheetClose key={item.href} asChild>
                     <Button
@@ -325,6 +363,33 @@ export function AppShell({ children }: { children: ReactNode }) {
         <Toaster closeButton position="top-right" />
       </div>
     </ConversationRealtimeProvider>
+  );
+}
+
+type CreditSummaryUser = {
+  creditBalance: number;
+  creditReserved: number;
+};
+
+function CreditSummary({ user, compact = false }: { user: CreditSummaryUser; compact?: boolean }) {
+  const reservedLabel = user.creditReserved > 0 ? ` · ${user.creditReserved} ${t("reserved")}` : "";
+
+  return (
+    <div
+      className={cn(
+        "flex min-w-0 items-center gap-1.5 text-muted-foreground",
+        compact ? "text-xs" : "mt-1 text-sm",
+      )}
+      aria-label={`${t("Available credits")}: ${user.creditBalance}${reservedLabel}`}
+    >
+      <Coins className="size-4 shrink-0" />
+      <span className="truncate">
+        {compact
+          ? `${user.creditBalance} ${t("credits")}`
+          : `${t("Available credits")}: ${user.creditBalance}`}
+        {reservedLabel}
+      </span>
+    </div>
   );
 }
 

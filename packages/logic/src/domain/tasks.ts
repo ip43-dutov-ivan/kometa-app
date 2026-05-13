@@ -124,9 +124,8 @@ export function toCreateTaskRequest(values: TaskFormValues): CreateTaskRequest {
     category: normalizeTaskCategoryId(values.category),
     location: normalizeTaskLocation(values.location),
     compensation: {
-      type: "money",
-      amount: Math.max(0, Number(values.amount) || 0),
-      currency: "UAH",
+      type: "credits",
+      amount: Math.max(0, Math.trunc(Number(values.amount) || 0)),
     },
   };
 }

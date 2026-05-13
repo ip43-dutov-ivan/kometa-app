@@ -42,6 +42,8 @@ export interface UserProfile {
   completedTasks: number;
   accountStatus: "active" | "blocked";
   avatarUrl?: string;
+  creditBalance: number;
+  creditReserved: number;
   blockedReason?: string;
   blockedAt?: string;
 }
@@ -69,9 +71,8 @@ export interface Task {
   category: string;
   location: TaskLocation;
   compensation: {
-    type: "money";
+    type: "credits";
     amount: number;
-    currency: "UAH";
   };
   status: TaskStatus;
   ownerId: UserId;

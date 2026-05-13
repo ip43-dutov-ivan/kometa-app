@@ -85,7 +85,7 @@ export function MyResponsesPage() {
                 {task ? (
                   <p>
                     {getTaskLocationLabel(task.location)} · {task.compensation.amount}{" "}
-                    {task.compensation.currency}
+                    {t("credits")}
                   </p>
                 ) : null}
               </CardContent>

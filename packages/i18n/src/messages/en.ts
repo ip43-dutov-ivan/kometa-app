@@ -43,7 +43,15 @@ export const messages = {
   "Completion request id is required by the API contract.":
     "Completion request id is required by the API contract.",
   Compensation: "Compensation",
-  "Compensation, UAH": "Compensation, UAH",
+  "Available credits": "Available credits",
+  credits: "credits",
+  "Describe the help you need and set a credit reward.":
+    "Describe the help you need and set a credit reward.",
+  "Enter a positive credit reward.": "Enter a positive credit reward.",
+  reserved: "reserved",
+  "Reward, credits": "Reward, credits",
+  "You do not have enough available credits for this reward.":
+    "You do not have enough available credits for this reward.",
   "Complex portfolios required": "Complex portfolios required",
   "Concern reason": "Concern reason",
   "Connect and coordinate the details": "Connect and coordinate the details",
@@ -73,8 +81,6 @@ export const messages = {
   "Delete this task?": "Delete this task?",
   Description: "Description",
   Discover: "Discover",
-  "Describe the help you need and set compensation.":
-    "Describe the help you need and set compensation.",
   "Displays the mobile sidebar.": "Displays the mobile sidebar.",
   "Duplicate task": "Duplicate task",
   Email: "Email",

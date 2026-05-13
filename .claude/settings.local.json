@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm --filter my-project add framer-motion)",
+      "Bash(pnpm --filter my-project exec tsc --noEmit)"
+    ]
+  }
+}

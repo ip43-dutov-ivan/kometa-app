@@ -38,6 +38,9 @@ class TaskEndpointTests(APITestCase):
         self.assertEqual(create_data['location']['longitude'], 30.4615)
         self.assertEqual(create_data['location']['cityId'], 'ua-kyiv')
         self.assertEqual(create_data['location']['cityLabel'], 'Kyiv')
+        self.owner.refresh_from_db()
+        self.assertEqual(self.owner.credit_balance, 75)
+        self.assertEqual(self.owner.credit_reserved, 25)
 
         retrieve_response = self.owner_client.get(f'/api/v1/tasks/{task_id}')
         self.assertEqual(retrieve_response.status_code, status.HTTP_200_OK)
@@ -171,3 +174,25 @@ class TaskEndpointTests(APITestCase):
         response = self.client.get('/api/v1/tasks')
 
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_create_task_rejects_insufficient_credits(self):
+        response = self.owner_client.post(
+            '/api/v1/tasks',
+            task_payload(compensation={'type': 'credits', 'amount': 101}),
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.owner.refresh_from_db()
+        self.assertEqual(self.owner.credit_balance, 100)
+        self.assertEqual(self.owner.credit_reserved, 0)
+
+    def test_create_task_requires_credit_compensation(self):
+        response = self.owner_client.post(
+            '/api/v1/tasks',
+            task_payload(compensation={'type': 'money', 'amount': 25, 'currency': 'UAH'}),
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('compensation', response.json())

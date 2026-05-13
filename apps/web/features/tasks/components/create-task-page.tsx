@@ -104,6 +104,17 @@ export function CreateTaskPage({ duplicateFrom }: { duplicateFrom?: string }) {
       return;
     }
 
+    const rewardAmount = Math.trunc(Number(amount) || 0);
+    if (rewardAmount <= 0) {
+      setError(t("Enter a positive credit reward."));
+      return;
+    }
+
+    if (user && rewardAmount > user.creditBalance) {
+      setError(t("You do not have enough available credits for this reward."));
+      return;
+    }
+
     setIsSubmitting(true);
 
     const request = toCreateTaskRequest({
@@ -111,7 +122,7 @@ export function CreateTaskPage({ duplicateFrom }: { duplicateFrom?: string }) {
       description,
       category,
       location,
-      amount: Number(amount),
+      amount: rewardAmount,
     });
 
     try {
@@ -139,8 +150,14 @@ export function CreateTaskPage({ duplicateFrom }: { duplicateFrom?: string }) {
         <p className="mt-2 text-muted-foreground">
           {isDuplicate
             ? t("Review the copied details and publish a new task.")
-            : t("Describe the help you need and set compensation.")}
+            : t("Describe the help you need and set a credit reward.")}
         </p>
+        {user ? (
+          <p className="mt-2 text-sm text-muted-foreground">
+            {t("Available credits")}: {user.creditBalance}
+            {user.creditReserved > 0 ? ` (${user.creditReserved} ${t("reserved")})` : ""}
+          </p>
+        ) : null}
       </div>
       <Card className="rounded-lg">
         <CardHeader>
@@ -177,13 +194,14 @@ export function CreateTaskPage({ duplicateFrom }: { duplicateFrom?: string }) {
                 <TaskCategorySelect name="category" value={category} onValueChange={setCategory} />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="amount">{t("Compensation, UAH")}</Label>
+                <Label htmlFor="amount">{t("Reward, credits")}</Label>
                 <Input
                   id="amount"
                   name="amount"
                   type="number"
-                  min="0"
+                  min="1"
                   step="1"
+                  max={user?.creditBalance}
                   value={amount}
                   onChange={(event) => setAmount(event.target.value)}
                   required

@@ -9,6 +9,7 @@ import {
   chatRealtimeStore,
   selectConversationMessages,
   type ChatServerEvent,
+  type CompletionRequest,
   type Conversation,
   type Task,
 } from "@kometa/logic";
@@ -16,6 +17,17 @@ import { useStore } from "zustand";
 import { kometaApi } from "@/shared/api/client";
 import { EmptyState, ErrorState, LoadingState } from "@/shared/components/page-state";
 import { useKometaSession } from "@/shared/session/use-kometa-session";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
@@ -23,16 +35,20 @@ import { cn } from "@/lib/utils";
 import { useConversationSocket } from "../hooks/use-conversation-socket";
 
 export function ChatPage({ conversationId }: { conversationId: string }) {
-  const { user } = useKometaSession();
+  const { user, setUser } = useKometaSession();
 
   const [conversation, setConversation] = useState<Conversation | null>(null);
   const [task, setTask] = useState<Task | null>(null);
+  const [pendingCompletionRequest, setPendingCompletionRequest] =
+    useState<CompletionRequest | null>(null);
   const messages = useStore(chatRealtimeStore, selectConversationMessages(conversationId));
   const [hasMore, setHasMore] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [sendError, setSendError] = useState<string | null>(null);
+  const [completionActionError, setCompletionActionError] = useState<string | null>(null);
+  const [isConfirmingCompletion, setIsConfirmingCompletion] = useState(false);
   const [showNewMessages, setShowNewMessages] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -100,10 +116,17 @@ export function ChatPage({ conversationId }: { conversationId: string }) {
           kometaApi.conversations.listMessages(conversationId, { limit: 50 }),
           kometaApi.tasks.get(nextConversation.taskId).catch(() => null),
         ]);
+        const completionRequests =
+          nextTask?.status === "completionRequested"
+            ? await kometaApi.tasks.listCompletionRequests(nextTask.id).catch(() => [])
+            : [];
         if (cancelled) return;
 
         setConversation(nextConversation);
         setTask(nextTask);
+        setPendingCompletionRequest(
+          completionRequests.find((request) => request.status === "pending") ?? null,
+        );
         chatRealtimeStore
           .getState()
           .initializeConversationMessages(conversationId, messagesResponse.items);
@@ -261,6 +284,34 @@ export function ChatPage({ conversationId }: { conversationId: string }) {
     }
   }
 
+  async function confirmCompletion() {
+    if (!task || !pendingCompletionRequest) {
+      setCompletionActionError(t("Completion request id is required by the API contract."));
+      return;
+    }
+
+    setIsConfirmingCompletion(true);
+    setCompletionActionError(null);
+    try {
+      const response = await kometaApi.tasks.confirmCompletion(
+        task.id,
+        pendingCompletionRequest.id,
+      );
+      setTask(response.task);
+      setPendingCompletionRequest(response.completionRequest);
+      const nextUser = await kometaApi.users.getMe().catch(() => null);
+      if (nextUser) {
+        setUser(nextUser);
+      }
+    } catch (caughtError) {
+      setCompletionActionError(
+        caughtError instanceof Error ? caughtError.message : t("Completion confirmation failed."),
+      );
+    } finally {
+      setIsConfirmingCompletion(false);
+    }
+  }
+
   // ── render ────────────────────────────────────────────────────────────────
 
   if (isLoading) return <LoadingState label={t("Loading chat")} />;
@@ -281,6 +332,11 @@ export function ChatPage({ conversationId }: { conversationId: string }) {
     task?.ownerId === user?.id
       ? `/app/my-tasks/${conversation.taskId}?returnToConversationId=${encodeURIComponent(conversationId)}`
       : `/app/tasks/${conversation.taskId}?returnToConversationId=${encodeURIComponent(conversationId)}`;
+  const canConfirmCompletion = Boolean(
+    task?.status === "completionRequested" &&
+    pendingCompletionRequest?.status === "pending" &&
+    pendingCompletionRequest.requestedByUserId !== user?.id,
+  );
 
   return (
     <div className="grid gap-5">
@@ -307,6 +363,15 @@ export function ChatPage({ conversationId }: { conversationId: string }) {
       </div>
 
       {sendError ? <ErrorState message={sendError} /> : null}
+      {completionActionError ? <ErrorState message={completionActionError} /> : null}
+      {task && pendingCompletionRequest ? (
+        <CompletionRequestCallout
+          canConfirm={canConfirmCompletion}
+          isConfirming={isConfirmingCompletion}
+          task={task}
+          onConfirm={confirmCompletion}
+        />
+      ) : null}
 
       <div className="relative">
         <Card className="rounded-lg">
@@ -389,6 +454,74 @@ export function ChatPage({ conversationId }: { conversationId: string }) {
           {t("Send")}
         </Button>
       </form>
+    </div>
+  );
+}
+
+function CompletionRequestCallout({
+  canConfirm,
+  isConfirming,
+  task,
+  onConfirm,
+}: {
+  canConfirm: boolean;
+  isConfirming: boolean;
+  task: Task;
+  onConfirm: () => void;
+}) {
+  if (task.status === "completed") {
+    return (
+      <div className="flex flex-col gap-3 rounded-lg border bg-muted/40 p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="font-medium">{t("Completion confirmed")}</p>
+          <p className="text-sm text-muted-foreground">
+            {t("Credits have been transferred to the provider.")}
+          </p>
+        </div>
+        <Button asChild variant="outline">
+          <Link href={`/app/tasks/${task.id}/feedback`}>
+            <Check />
+            {t("Feedback")}
+          </Link>
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between">
+      <div>
+        <p className="font-medium">{t("Completion requested")}</p>
+        <p className="text-sm text-muted-foreground">
+          {canConfirm
+            ? t("Approve when the work is done. This permanently transfers the reserved credits.")
+            : t("Waiting for the other participant to review the completion request.")}
+        </p>
+      </div>
+      {canConfirm ? (
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button disabled={isConfirming}>
+              <Check />
+              {t("Approve completion")}
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>{t("Approve completion?")}</AlertDialogTitle>
+              <AlertDialogDescription>
+                {t(
+                  "This permanently transfers the reserved credits to the provider and marks the task as completed.",
+                )}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>{t("Cancel")}</AlertDialogCancel>
+              <AlertDialogAction onClick={onConfirm}>{t("Approve completion")}</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      ) : null}
     </div>
   );
 }

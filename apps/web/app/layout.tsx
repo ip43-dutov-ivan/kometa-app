@@ -1,8 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Analytics } from "@vercel/analytics/next";
 import { defaultI18n } from "@kometa/i18n";
-import { Inter } from "next/font/google";
-import localFont from "next/font/local";
+import { Inter, Manrope } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
 import { KometaI18nProvider } from "@/shared/i18n/i18n-provider";
 import { MockServiceWorker } from "@/shared/mocks/mock-service-worker";
@@ -14,10 +13,9 @@ const inter = Inter({
   variable: "--font-inter",
 });
 
-const spaceGrotesk = localFont({
-  src: "../../../packages/assets/fonts/SpaceGrotesk-VariableFont_wght.ttf",
+const manrope = Manrope({
+  subsets: ["latin", "cyrillic"],
   variable: "--font-space-grotesk",
-  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -56,7 +54,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="bg-background" suppressHydrationWarning>
-      <body className={`${inter.variable} ${spaceGrotesk.variable} font-sans antialiased`}>
+      <body className={`${inter.variable} ${manrope.variable} font-sans antialiased`}>
         <ThemeProvider
           attribute="class"
           defaultTheme="dark"

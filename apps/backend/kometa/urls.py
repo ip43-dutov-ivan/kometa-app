@@ -47,6 +47,7 @@ urlpatterns = [
     
     # Completion requests (nested under tasks)
     path('tasks/<str:task_id>/completion-requests', CompletionRequestViewSet.as_view({
+        'get': 'list',
         'post': 'create'
     }), name='task-completion-requests'),
     path('tasks/<str:task_id>/completion-requests/<str:pk>/confirm', CompletionRequestViewSet.as_view({

@@ -6,8 +6,11 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
-from ..models import CompletionRequest, Task
+from django.db import transaction
+
+from ..models import CompletionRequest, Task, User
 from ..serializers import CompletionRequestSerializer, TaskSerializer
+from .tasks import get_credit_amount
 
 logger = logging.getLogger(__name__)
 
@@ -122,63 +125,107 @@ class CompletionRequestViewSet(ModelViewSet):
     @action(detail=True, methods=['post'])
     def confirm(self, request, task_id=None, pk=None):
         """Confirm completion of a task"""
-        try:
-            task = Task.objects.get(id=task_id)
-            completion_request = CompletionRequest.objects.get(id=pk, task=task)
-        except (Task.DoesNotExist, CompletionRequest.DoesNotExist):
-            return Response(
-                {'detail': 'Task or completion request not found.'},
-                status=status.HTTP_404_NOT_FOUND
-            )
+        with transaction.atomic():
+            try:
+                task = (
+                    Task.objects
+                    .select_for_update()
+                    .select_related('owner')
+                    .get(id=task_id)
+                )
+                completion_request = (
+                    CompletionRequest.objects
+                    .select_for_update()
+                    .get(id=pk, task=task)
+                )
+            except (Task.DoesNotExist, CompletionRequest.DoesNotExist):
+                return Response(
+                    {'detail': 'Task or completion request not found.'},
+                    status=status.HTTP_404_NOT_FOUND
+                )
 
-        if task.status != 'completionRequested':
-            return Response(
-                {'detail': 'Task must be in completionRequested status.'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            if task.status != 'completionRequested':
+                return Response(
+                    {'detail': 'Task must be in completionRequested status.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
 
-        if task.selected_response is None:
-            return Response(
-                {'detail': 'Task has no matched provider.'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            if completion_request.status != 'pending':
+                return Response(
+                    {'detail': 'Completion request must be pending.'},
+                    status=status.HTTP_409_CONFLICT
+                )
 
-        # Can only be confirmed by the other participant
-        is_owner = task.owner == request.user
-        is_provider = task.selected_response.provider == request.user
-        is_requester = completion_request.requested_by == request.user
+            if task.selected_response is None:
+                return Response(
+                    {'detail': 'Task has no matched provider.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
 
-        if not ((is_owner or is_provider) and not is_requester):
-            logger.warning(
-                'Completion confirm denied task_id=%s completion_request_id=%s actor_id=%s requester_id=%s reason=not_other_participant',
+            provider = task.selected_response.provider
+            if task.owner_id == provider.id:
+                return Response(
+                    {'detail': 'Task owner cannot receive their own credit payout.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Can only be confirmed by the other participant
+            is_owner = task.owner == request.user
+            is_provider = provider == request.user
+            is_requester = completion_request.requested_by == request.user
+
+            if not ((is_owner or is_provider) and not is_requester):
+                logger.warning(
+                    'Completion confirm denied task_id=%s completion_request_id=%s actor_id=%s requester_id=%s reason=not_other_participant',
+                    task.id,
+                    completion_request.id,
+                    request.user.id,
+                    completion_request.requested_by_id,
+                )
+                return Response(
+                    {'detail': 'Only the other matched participant can confirm completion.'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+
+            amount = get_credit_amount(task.compensation)
+            if amount is None:
+                return Response(
+                    {'detail': 'Task has invalid credit compensation.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            owner = User.objects.select_for_update().get(pk=task.owner_id)
+            provider = User.objects.select_for_update().get(pk=provider.pk)
+            if owner.credit_reserved < amount:
+                return Response(
+                    {'detail': 'Task owner does not have enough reserved credits for payout.'},
+                    status=status.HTTP_409_CONFLICT
+                )
+
+            owner.credit_reserved -= amount
+            provider.credit_balance += amount
+            owner.save(update_fields=['credit_reserved'])
+            provider.save(update_fields=['credit_balance'])
+
+            # Confirm the request
+            completion_request.status = 'confirmed'
+            completion_request.confirmed_by = request.user
+            completion_request.save()
+
+            # Update task to completed
+            old_status = task.status
+            task.status = 'completed'
+            task.save()
+            logger.info(
+                'Completion confirmed task_id=%s completion_request_id=%s actor_id=%s requester_id=%s old_status=%s new_status=%s paid_credits=%s',
                 task.id,
                 completion_request.id,
                 request.user.id,
                 completion_request.requested_by_id,
+                old_status,
+                task.status,
+                amount,
             )
-            return Response(
-                {'detail': 'Only the other matched participant can confirm completion.'},
-                status=status.HTTP_403_FORBIDDEN
-            )
-
-        # Confirm the request
-        completion_request.status = 'confirmed'
-        completion_request.confirmed_by = request.user
-        completion_request.save()
-
-        # Update task to completed
-        old_status = task.status
-        task.status = 'completed'
-        task.save()
-        logger.info(
-            'Completion confirmed task_id=%s completion_request_id=%s actor_id=%s requester_id=%s old_status=%s new_status=%s',
-            task.id,
-            completion_request.id,
-            request.user.id,
-            completion_request.requested_by_id,
-            old_status,
-            task.status,
-        )
 
         serializer = self.get_serializer(completion_request)
         task_serializer = TaskSerializer(task)

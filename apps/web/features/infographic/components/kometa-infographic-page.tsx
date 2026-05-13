@@ -3,79 +3,96 @@ const roles = [
   { label: "Pj.M", tone: "dark" },
   { label: "Arch", tone: "light" },
   { label: "Dev", tone: "light" },
-  { label: "QA", tone: "steel" },
+  { label: "QA", tone: "primary" },
   { label: "UX", tone: "primary" },
   { label: "Ops", tone: "dark" },
 ] as const;
+
+type RaciAssignment = "R" | "A" | "C" | "I" | "";
+type AssignmentRow = readonly [
+  RaciAssignment,
+  RaciAssignment,
+  RaciAssignment,
+  RaciAssignment,
+  RaciAssignment,
+  RaciAssignment,
+  RaciAssignment,
+];
+
+type Milestone = {
+  id: number;
+  title: string;
+  assignments: AssignmentRow;
+};
 
 const milestones = [
   {
     id: 1,
     title: "Створення інфраструктури базового рівня.",
-    assignments: ["", "C", "A", "I", "", "", "R"],
+    assignments: ["I", "C", "A", "C", "I", "", "R"],
   },
   {
     id: 2,
-    title: "Establishment of basic functionality, consumer-provider after-match communication",
-    assignments: ["", "A", "", "R", "", "", ""],
+    title: "Запуск базової функціональності та комунікації consumer-provider після матчу",
+    assignments: ["C", "A", "C", "R", "R", "C", "I"],
   },
   {
     id: 3,
-    title: "Launch of Credit economy",
-    assignments: ["C", "A", "", "R", "", "", ""],
+    title: "Запуск кредитної економіки",
+    assignments: ["A", "C", "C", "R", "R", "C", "I"],
   },
   {
     id: 4,
-    title: "Completion of basic user-friendly UI",
-    assignments: ["", "A", "", "R", "C", "C", ""],
+    title: "Завершення базового зручного UI",
+    assignments: ["C", "C", "", "R", "R", "A", ""],
   },
-] as const;
+] as const satisfies readonly Milestone[];
 
 const nextMilestones = [
   {
     id: 1,
-    title: "Implementation of reputation system (better than ratings)",
-    assignments: ["", "", "", "R", "", "C", ""],
+    title: "Впровадження системи репутації, кращої за рейтинги",
+    assignments: ["A", "C", "C", "R", "R", "C", ""],
   },
   {
     id: 2,
-    title: "Implementation of push-notifications",
-    assignments: ["", "", "", "R", "", "C", ""],
+    title: "Впровадження push-сповіщень",
+    assignments: ["C", "A", "C", "R", "R", "C", "R"],
   },
   {
     id: 3,
-    title: "Calibration of match-making system and logic",
-    assignments: ["", "", "A", "R", "", "", ""],
+    title: "Калібрування системи та логіки match-making",
+    assignments: ["A", "C", "C", "R", "R", "C", ""],
   },
   {
     id: 4,
-    title: "Visual UI enhancements",
-    assignments: ["", "", "", "R", "", "A", ""],
+    title: "Візуальні покращення UI",
+    assignments: ["C", "C", "", "R", "R", "A", ""],
   },
-] as const;
+] as const satisfies readonly Milestone[];
 
 const laterMilestones = [
   {
     id: 1,
-    title: "Tinder-like match-making, Calendar integration",
-    assignments: ["", "A", "", "R", "C", "", ""],
+    title: "Tinder-like match-making та інтеграція календаря",
+    assignments: ["A", "C", "C", "R", "R", "C", "C"],
   },
   {
     id: 2,
-    title: "Safety & Security improvement, active moderation",
-    assignments: ["C", "A", "C", "R", "", "C", "R"],
+    title: "Покращення Safety & Security та активна модерація",
+    assignments: ["A", "C", "C", "R", "R", "C", "R"],
   },
   {
     id: 3,
-    title: "Complex business logic implementation",
-    assignments: ["", "A", "C", "R", "", "", ""],
+    title: "Впровадження складної бізнес-логіки",
+    assignments: ["A", "C", "C", "R", "R", "", ""],
   },
   {
     id: 4,
-    title: "Data Warehousing & Analytics",
-    assignments: ["C", "A", "C", "R", "", "", ""],
+    title: "Data Warehousing та аналітика",
+    assignments: ["A", "C", "C", "R", "R", "", "R"],
   },
-] as const;
+] as const satisfies readonly Milestone[];
 
 const roleToneClass = {
   primary:
@@ -88,32 +105,26 @@ const roleToneClass = {
 export function KometaInfographicPage() {
   return (
     <main className="min-h-screen overflow-hidden bg-background text-foreground">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-20 px-4 py-10 sm:px-6 lg:px-8">
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-4 py-6 sm:px-6 lg:px-8 print:gap-4 print:py-2">
         <InfographicSection
           label="NOW"
-          goal="Completion and launch of Kometa MVP"
+          goal="Завершення та запуск Kometa MVP"
           milestones={milestones}
         />
         <InfographicSection
           label="NEXT"
-          goal="Improvement of overall user experience"
+          goal="Покращення загального користувацького досвіду"
           milestones={nextMilestones}
         />
         <InfographicSection
           label="LATER"
-          goal="Product scaling, gamification"
+          goal="Масштабування продукту та гейміфікація"
           milestones={laterMilestones}
         />
       </div>
     </main>
   );
 }
-
-type Milestone = {
-  id: number;
-  title: string;
-  assignments: readonly string[];
-};
 
 function InfographicSection({
   label,
@@ -125,27 +136,27 @@ function InfographicSection({
   milestones: readonly Milestone[];
 }) {
   return (
-    <section className="flex min-h-screen w-full flex-col justify-center">
-      <div className="mb-10 grid gap-6 lg:grid-cols-[minmax(180px,280px)_1fr_minmax(170px,260px)] lg:items-center">
-        <div className="flex h-14 items-center justify-center rounded-lg border border-primary/40 bg-primary px-8 font-heading text-2xl font-semibold text-primary-foreground shadow-[0_0_32px_rgb(103_232_249/0.25)]">
-          {label}
-        </div>
-
-        <div className="relative hidden h-10 lg:block">
-          <div className="absolute top-1/2 left-0 h-3 w-[calc(100%-1.5rem)] -translate-y-1/2 rounded-full bg-primary/70" />
-          <div className="absolute top-1/2 right-0 h-0 w-0 -translate-y-1/2 border-y-[22px] border-l-[28px] border-y-transparent border-l-primary/70" />
-        </div>
-
-        <div className="flex items-center gap-4 lg:justify-end">
-          <div className="flex size-10 shrink-0 items-center justify-center rounded-full border border-white/20 bg-white/80 font-heading text-xl font-semibold text-background">
-            G
-          </div>
-          <p className="max-w-56 text-sm leading-snug text-muted-foreground">{goal}</p>
-        </div>
-      </div>
-
+    <section className="flex w-full flex-col justify-start print:break-inside-avoid">
       <div className="overflow-x-auto pb-4">
-        <div className="grid min-w-[980px] grid-cols-[280px_repeat(7,92px)] gap-x-1">
+        <div className="mb-5 grid min-w-[952px] grid-cols-[280px_362px_270px] items-center gap-5 print:mb-3">
+          <div className="flex h-14 items-center justify-center rounded-lg border border-primary/40 bg-primary px-8 font-heading text-2xl font-semibold text-primary-foreground shadow-[0_0_32px_rgb(103_232_249/0.25)]">
+            {label}
+          </div>
+
+          <div className="relative h-10">
+            <div className="absolute top-1/2 left-0 h-3 w-[calc(100%-1.25rem)] -translate-y-1/2 rounded-full bg-primary/70" />
+            <div className="absolute top-1/2 right-0 h-0 w-0 -translate-y-1/2 border-y-[22px] border-l-[28px] border-y-transparent border-l-primary/70" />
+          </div>
+
+          <div className="flex min-h-14 items-center gap-4 rounded-lg border border-white/55 bg-white/[0.03] px-4 shadow-[inset_0_1px_0_rgb(255_255_255/0.08)]">
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-full border border-white/20 bg-white/80 font-heading text-xl font-semibold text-background">
+              G
+            </div>
+            <p className="max-w-[196px] text-sm leading-snug text-muted-foreground">{goal}</p>
+          </div>
+        </div>
+
+        <div className="grid min-w-[952px] grid-cols-[280px_repeat(7,92px)] gap-x-1">
           <div />
           {roles.map((role) => (
             <div key={role.label} className="px-2 pb-3">

@@ -35,6 +35,8 @@ export interface User {
   completedTasks: number;
   accountStatus: AccountStatus;
   avatarUrl?: string;
+  creditBalance: number;
+  creditReserved: number;
 }
 
 export type TaskStatus =
@@ -45,13 +47,12 @@ export type TaskStatus =
   | "completed"
   | "cancelled";
 
-export interface MoneyCompensation {
-  type: "money";
+export interface CreditCompensation {
+  type: "credits";
   amount: number;
-  currency: "UAH";
 }
 
-export type Compensation = MoneyCompensation;
+export type Compensation = CreditCompensation;
 
 export interface TaskLocation {
   label: string;

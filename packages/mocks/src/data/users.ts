@@ -14,6 +14,8 @@ export const users: UserProfile[] = [
     completedTasks: 12,
     accountStatus: "active",
     avatarUrl: "/placeholder-user.jpg",
+    creditBalance: 45,
+    creditReserved: 55,
   },
   {
     id: "user-2",
@@ -26,6 +28,8 @@ export const users: UserProfile[] = [
     completedTasks: 18,
     accountStatus: "active",
     avatarUrl: "/placeholder-user.jpg",
+    creditBalance: 75,
+    creditReserved: 75,
   },
   {
     id: "user-3",
@@ -38,6 +42,8 @@ export const users: UserProfile[] = [
     completedTasks: 9,
     accountStatus: "active",
     avatarUrl: "/placeholder-user.jpg",
+    creditBalance: 35,
+    creditReserved: 65,
   },
   {
     id: "user-4",
@@ -50,6 +56,8 @@ export const users: UserProfile[] = [
     completedTasks: 6,
     accountStatus: "blocked",
     avatarUrl: "/placeholder-user.jpg",
+    creditBalance: 100,
+    creditReserved: 0,
     blockedReason: "Repeatedly moved task coordination outside the platform after reports.",
     blockedAt: "2026-05-04T20:00:00.000Z",
   },

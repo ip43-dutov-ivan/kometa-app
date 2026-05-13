@@ -2,11 +2,13 @@ import logging
 
 from rest_framework import mixins, status
 from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
+from django.db import transaction
 from django.db.models import Count, Q
-from ..models import Feedback, Task
+from ..models import Feedback, Task, User
 from ..serializers import FeedbackSerializer, TaskSerializer
 
 logger = logging.getLogger(__name__)
@@ -33,12 +35,25 @@ class TaskViewSet(
     http_method_names = ['get', 'post', 'delete', 'head', 'options']
 
     def perform_create(self, serializer):
-        task = serializer.save(owner=self.request.user)
+        amount = serializer.validated_data['compensation']['amount']
+        with transaction.atomic():
+            owner = User.objects.select_for_update().get(pk=self.request.user.pk)
+            if owner.credit_balance < amount:
+                raise ValidationError({
+                    'compensation': 'Insufficient credits to create this task.',
+                })
+
+            owner.credit_balance -= amount
+            owner.credit_reserved += amount
+            owner.save(update_fields=['credit_balance', 'credit_reserved'])
+            task = serializer.save(owner=owner)
+
         logger.info(
-            'Task created task_id=%s owner_id=%s status=%s',
+            'Task created task_id=%s owner_id=%s status=%s reserved_credits=%s',
             task.id,
-            self.request.user.id,
+            owner.id,
             task.status,
+            amount,
         )
 
     def get_queryset(self):
@@ -132,38 +147,53 @@ class TaskViewSet(
         })
 
     def destroy(self, request, *args, **kwargs):
-        task = self.get_object()
-        if task.owner != request.user:
-            logger.warning(
-                'Task delete denied task_id=%s actor_id=%s owner_id=%s reason=not_owner',
-                task.id,
-                request.user.id,
-                task.owner_id,
+        with transaction.atomic():
+            task = (
+                Task.objects
+                .select_for_update()
+                .select_related('owner')
+                .get(pk=self.get_object().pk)
             )
-            return Response(
-                {'detail': 'Only the task owner can delete this task.'},
-                status=status.HTTP_403_FORBIDDEN
-            )
-        if task.status != 'open':
-            logger.warning(
-                'Task delete denied task_id=%s actor_id=%s status=%s reason=invalid_status',
-                task.id,
-                request.user.id,
-                task.status,
-            )
-            return Response(
-                {'detail': 'Only open tasks can be deleted.'},
-                status=status.HTTP_409_CONFLICT
-            )
+            if task.owner != request.user:
+                logger.warning(
+                    'Task delete denied task_id=%s actor_id=%s owner_id=%s reason=not_owner',
+                    task.id,
+                    request.user.id,
+                    task.owner_id,
+                )
+                return Response(
+                    {'detail': 'Only the task owner can delete this task.'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            if task.status != 'open':
+                logger.warning(
+                    'Task delete denied task_id=%s actor_id=%s status=%s reason=invalid_status',
+                    task.id,
+                    request.user.id,
+                    task.status,
+                )
+                return Response(
+                    {'detail': 'Only open tasks can be deleted.'},
+                    status=status.HTTP_409_CONFLICT
+                )
 
-        declined_count = task.responses.filter(status='pending').update(status='declined')
-        task.status = 'cancelled'
-        task.save(update_fields=['status', 'updated_at'])
+            amount = get_credit_amount(task.compensation)
+            owner = User.objects.select_for_update().get(pk=task.owner_id)
+            if amount:
+                owner.credit_reserved = max(0, owner.credit_reserved - amount)
+                owner.credit_balance += amount
+                owner.save(update_fields=['credit_balance', 'credit_reserved'])
+
+            declined_count = task.responses.filter(status='pending').update(status='declined')
+            task.status = 'cancelled'
+            task.save(update_fields=['status', 'updated_at'])
+
         logger.info(
-            'Task cancelled task_id=%s owner_id=%s declined_responses=%s',
+            'Task cancelled task_id=%s owner_id=%s declined_responses=%s released_credits=%s',
             task.id,
             request.user.id,
             declined_count,
+            get_credit_amount(task.compensation) or 0,
         )
         serializer = self.get_serializer(task)
         return Response(serializer.data)
@@ -311,4 +341,15 @@ class TaskViewSet(
                 'hasMore': offset + limit < total,
             },
         })
+
+
+def get_credit_amount(compensation):
+    if not isinstance(compensation, dict):
+        return None
+    if compensation.get('type') != 'credits':
+        return None
+    amount = compensation.get('amount')
+    if isinstance(amount, bool) or not isinstance(amount, int) or amount <= 0:
+        return None
+    return amount
 

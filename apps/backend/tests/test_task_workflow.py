@@ -35,7 +35,7 @@ class TaskWorkflowTests(APITestCase):
                     'latitude': 50.45,
                     'longitude': 30.52,
                 },
-                compensation={'type': 'money', 'amount': 200, 'currency': 'UAH'},
+                compensation={'type': 'credits', 'amount': 25},
             ),
             format='json',
         )
@@ -118,6 +118,13 @@ class TaskWorkflowTests(APITestCase):
         completion_request_id = completion_response.json()['completionRequest']['id']
         self.assertEqual(completion_response.json()['task']['status'], 'completionRequested')
 
+        list_completion_requests = self.owner_client.get(
+            f'/api/v1/tasks/{task_id}/completion-requests',
+        )
+        self.assertEqual(list_completion_requests.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(list_completion_requests.json()), 1)
+        self.assertEqual(list_completion_requests.json()[0]['id'], completion_request_id)
+
         confirm_response = self.owner_client.post(
             f'/api/v1/tasks/{task_id}/completion-requests/{completion_request_id}/confirm',
             {},
@@ -126,6 +133,11 @@ class TaskWorkflowTests(APITestCase):
         self.assertEqual(confirm_response.status_code, status.HTTP_200_OK)
         self.assertEqual(confirm_response.json()['completionRequest']['status'], 'confirmed')
         self.assertEqual(confirm_response.json()['task']['status'], 'completed')
+        self.owner.refresh_from_db()
+        self.provider1.refresh_from_db()
+        self.assertEqual(self.owner.credit_reserved, 0)
+        self.assertEqual(self.owner.credit_balance, 75)
+        self.assertEqual(self.provider1.credit_balance, 125)
 
         owner_feedback = self.owner_client.post(
             f'/api/v1/tasks/{task_id}/feedback',
@@ -249,6 +261,9 @@ class TaskWorkflowTests(APITestCase):
         self.assertEqual(response.json()['status'], 'cancelled')
         task_response.refresh_from_db()
         self.assertEqual(task_response.status, 'declined')
+        self.owner.refresh_from_db()
+        self.assertEqual(self.owner.credit_balance, 100)
+        self.assertEqual(self.owner.credit_reserved, 0)
 
     def test_non_owner_cannot_cancel_task(self):
         task = create_task(owner=self.owner)
@@ -308,3 +323,71 @@ class TaskWorkflowTests(APITestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
+
+    def test_completion_concern_does_not_transfer_credits(self):
+        task = create_task(owner=self.owner, status='matched')
+        task_response = TaskResponse.objects.create(
+            task=task,
+            provider=self.provider1,
+            comment='I can help.',
+            status='accepted',
+        )
+        task.selected_response = task_response
+        task.save()
+
+        completion_response = self.provider1_client.post(
+            f'/api/v1/tasks/{task.id}/completion-requests',
+            {'note': 'Done.'},
+            format='json',
+        )
+        self.assertEqual(completion_response.status_code, status.HTTP_201_CREATED)
+        completion_request_id = completion_response.json()['completionRequest']['id']
+
+        concern_response = self.owner_client.post(
+            f'/api/v1/tasks/{task.id}/completion-requests/{completion_request_id}/concerns',
+            {'reason': 'Needs one more change.'},
+            format='json',
+        )
+
+        self.assertEqual(concern_response.status_code, status.HTTP_200_OK)
+        self.owner.refresh_from_db()
+        self.provider1.refresh_from_db()
+        self.assertEqual(self.owner.credit_balance, 75)
+        self.assertEqual(self.owner.credit_reserved, 25)
+        self.assertEqual(self.provider1.credit_balance, 100)
+
+    def test_completion_confirmation_cannot_pay_twice(self):
+        task = create_task(owner=self.owner, status='matched')
+        task_response = TaskResponse.objects.create(
+            task=task,
+            provider=self.provider1,
+            comment='I can help.',
+            status='accepted',
+        )
+        task.selected_response = task_response
+        task.save()
+
+        completion_response = self.provider1_client.post(
+            f'/api/v1/tasks/{task.id}/completion-requests',
+            {'note': 'Done.'},
+            format='json',
+        )
+        completion_request_id = completion_response.json()['completionRequest']['id']
+
+        first_response = self.owner_client.post(
+            f'/api/v1/tasks/{task.id}/completion-requests/{completion_request_id}/confirm',
+            {},
+            format='json',
+        )
+        second_response = self.owner_client.post(
+            f'/api/v1/tasks/{task.id}/completion-requests/{completion_request_id}/confirm',
+            {},
+            format='json',
+        )
+
+        self.assertEqual(first_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(second_response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.owner.refresh_from_db()
+        self.provider1.refresh_from_db()
+        self.assertEqual(self.owner.credit_reserved, 0)
+        self.assertEqual(self.provider1.credit_balance, 125)

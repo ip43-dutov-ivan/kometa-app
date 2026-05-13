@@ -1,6 +1,6 @@
 import { http } from "msw";
 import { apiPath } from "../config";
-import { completionRequests, currentUserId, responses, tasks } from "../data";
+import { completionRequests, currentUserId, responses, tasks, users } from "../data";
 import type { CompletionRequest, Task, TaskLocation, TaskStatus, UserId } from "../types";
 import {
   createId,
@@ -119,10 +119,22 @@ export const taskHandlers = [
     const body = await request.json().catch(() => ({}));
     const input = body as Partial<Task>;
     const locationResult = normalizeTaskLocation(input.location);
+    const compensationResult = normalizeCreditCompensation(input.compensation);
 
     if ("response" in locationResult) {
       return locationResult.response;
     }
+
+    if ("response" in compensationResult) {
+      return compensationResult.response;
+    }
+
+    if (activeUser.user.creditBalance < compensationResult.compensation.amount) {
+      return error("Insufficient credits to create this task", "insufficient_credits", 400);
+    }
+
+    activeUser.user.creditBalance -= compensationResult.compensation.amount;
+    activeUser.user.creditReserved += compensationResult.compensation.amount;
 
     const task: Task = {
       id: createId("task"),
@@ -130,7 +142,7 @@ export const taskHandlers = [
       description: input.description?.trim() || "No description provided.",
       category: normalizeTaskCategory(input.category) || "other",
       location: locationResult.location,
-      compensation: input.compensation ?? { type: "money", amount: 0, currency: "UAH" },
+      compensation: compensationResult.compensation,
       status: "open",
       ownerId: currentUserId,
       createdAt: now(),
@@ -196,6 +208,11 @@ export const taskHandlers = [
     }
 
     const timestamp = now();
+    const owner = users.find((item) => item.id === task.ownerId);
+    if (owner) {
+      owner.creditBalance += task.compensation.amount;
+      owner.creditReserved = Math.max(0, owner.creditReserved - task.compensation.amount);
+    }
     task.status = "cancelled";
     task.updatedAt = timestamp;
 
@@ -324,6 +341,13 @@ export const taskHandlers = [
     result.completionRequest.updatedAt = timestamp;
     result.task.status = "completed";
     result.task.updatedAt = timestamp;
+    const owner = users.find((item) => item.id === result.task.ownerId);
+    const providerId = getMatchForTask(result.task.id)?.providerId;
+    const provider = users.find((item) => item.id === providerId);
+    if (owner && provider) {
+      owner.creditReserved = Math.max(0, owner.creditReserved - result.task.compensation.amount);
+      provider.creditBalance += result.task.compensation.amount;
+    }
 
     return json({ completionRequest: result.completionRequest, task: result.task });
   }),
@@ -438,6 +462,35 @@ function normalizeTaskLocation(value: TaskLocation | undefined) {
       cityLabel: value.cityLabel?.trim() || getLocationCityLabelFromLabel(label),
       countryCode: value.countryCode?.trim().toUpperCase() || "UA",
     } satisfies TaskLocation,
+  };
+}
+
+function normalizeCreditCompensation(value: Task["compensation"] | undefined) {
+  if (!value || typeof value !== "object") {
+    return { response: error("Credit compensation is required", "compensation_required", 422) };
+  }
+
+  if (value.type !== "credits") {
+    return {
+      response: error("Compensation type must be credits", "compensation_type_invalid", 422),
+    };
+  }
+
+  if (!Number.isInteger(value.amount) || value.amount <= 0) {
+    return {
+      response: error(
+        "Compensation amount must be a positive integer",
+        "compensation_amount_invalid",
+        422,
+      ),
+    };
+  }
+
+  return {
+    compensation: {
+      type: "credits",
+      amount: value.amount,
+    } satisfies Task["compensation"],
   };
 }
 

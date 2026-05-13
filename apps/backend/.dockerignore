@@ -1,0 +1,13 @@
+.env
+.venv
+__pycache__
+*.py[cod]
+*.sqlite3
+db.sqlite3
+media
+.pytest_cache
+.ruff_cache
+.mypy_cache
+test_output.txt
+tests
+README.md

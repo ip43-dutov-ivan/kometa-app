@@ -41,7 +41,7 @@ export function TaskCard({
         <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm">
           <span>{getTaskLocationLabel(task.location)}</span>
           <span>
-            {task.compensation.amount} {task.compensation.currency}
+            {task.compensation.amount} {t("credits")}
           </span>
         </div>
       </CardContent>

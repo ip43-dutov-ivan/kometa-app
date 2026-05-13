@@ -12,8 +12,8 @@ The contract follows the current product model from `docs/concept.md`, `docs/tz.
 - Protected endpoints require `Authorization: Bearer <accessToken>`.
 - List endpoints return `{ "items": [...], "pageInfo": {...} }`.
 - Resource timestamps use ISO 8601 strings.
-- MVP supports money compensation as task metadata only. Payment processing is out of scope for MVP; users coordinate payment outside the platform.
-- Credit compensation may remain in shared types as a reserved future value, but should not be exposed as an active MVP flow.
+- MVP uses internal credit compensation. New users receive 100 credits, task rewards are reserved on creation, and reserved credits transfer to the matched provider after confirmed completion.
+- Payment processing, credit purchase, cash-out, and dispute/escrow workflows are out of scope for MVP.
 - MVP chat uses authenticated task-scoped messages. P2P encryption is out of scope for MVP and may be revisited after the main task flow is proven.
 
 ## Common Shapes
@@ -57,6 +57,8 @@ type User = {
   completedTasks: number;
   accountStatus: "active" | "blocked";
   avatarUrl?: string;
+  creditBalance: number;
+  creditReserved: number;
 };
 ```
 
@@ -72,9 +74,8 @@ type TaskStatus =
   | "cancelled";
 
 type Compensation = {
-  type: "money";
+  type: "credits";
   amount: number;
-  currency: "UAH";
 };
 
 type Task = {
@@ -329,14 +330,13 @@ Request:
   "category": "Home tech",
   "location": "Kyiv, Podil",
   "compensation": {
-    "type": "money",
-    "amount": 350,
-    "currency": "UAH"
+    "type": "credits",
+    "amount": 35
   }
 }
 ```
 
-Response `201`: created task with `status: "open"`.
+Response `201`: created task with `status: "open"`. The owner credit balance is reduced by the reward amount and the same amount is added to reserved credits.
 
 #### Get Task
 
@@ -359,9 +359,8 @@ Request may include:
   "category": "Education",
   "location": "Remote",
   "compensation": {
-    "type": "money",
-    "amount": 250,
-    "currency": "UAH"
+    "type": "credits",
+    "amount": 25
   }
 }
 ```

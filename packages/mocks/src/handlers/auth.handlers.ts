@@ -28,6 +28,8 @@ export const authHandlers = [
       completedTasks: 0,
       accountStatus: "active",
       avatarUrl: "/placeholder-user.jpg",
+      creditBalance: 100,
+      creditReserved: 0,
     };
 
     users.push(user);
